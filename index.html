@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Field Run</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/images/logo.png">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+</head>
+<body>
+
+    <!-- CARTE -->
+    <div id="map"></div>
+
+    <!-- Bouton provisoire, à retirer/intégrer proprement une fois le menu final fait -->
+    <button id="BtnLogout" title="Déconnexion">Déconnexion</button>
+
+    <!-- ═══ ÉCRAN DE CONNEXION / INSCRIPTION ═══ -->
+    <div id="authScreen">
+        <div id="authSignature" aria-hidden="true">
+            <svg viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet">
+                <polyline class="authLoopPath" points="100,18 166,56 166,144 100,182 34,144 34,56 100,18"/>
+            </svg>
+        </div>
+
+        <img src="assets/images/logo_nobg.png" id="authLogo" alt="Field Run">
+        <h1 id="authTitle">Field Run</h1>
+        <p id="authTagline">Cours. Trace. Capture.</p>
+
+        <div id="authForm">
+            <input type="text" id="authUsername" placeholder="Pseudo" autocomplete="username" style="display:none">
+            <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
+            <div id="authPasswordWrap">
+                <input type="password" id="authPassword" placeholder="Mot de passe" autocomplete="current-password">
+                <button type="button" id="authPasswordToggle" aria-label="Afficher le mot de passe">
+                    <svg id="authPasswordToggleIconShow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg id="authPasswordToggleIconHide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a20.3 20.3 0 0 1-3.22 4.44M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+            </div>
+
+            <button id="authSubmitBtn">Connexion</button>
+
+            <p id="authError"></p>
+
+            <p id="authSwitchText">
+                Pas encore de compte ? <span id="authSwitchLink">Créer un compte</span>
+            </p>
+        </div>
+
+        <!-- Formulaire de saisie du code à 6 chiffres, affiché après inscription
+             (masqué par défaut, basculé par auth.js via showCodeScreen/hideCodeScreen) -->
+        <div id="authCodeForm" style="display:none">
+            <p id="authCodeHint">Entre le code reçu par email pour confirmer ton compte.</p>
+            <input type="text" id="authCode" placeholder="Code à 6 chiffres" inputmode="numeric" autocomplete="one-time-code">
+
+            <button id="authCodeSubmitBtn">Confirmer</button>
+
+            <p id="authResendLink">Renvoyer le code</p>
+        </div>
+    </div>
+
+    <!-- LOADER GPS -->
+    <div id="loader">
+        <div id="loaderRing"></div>
+        <img src="assets/images/logo_nobg.png" id="loaderLogo" alt="Field Run">
+        <p id="loaderText">Acquisition GPS…</p>
+    </div>
+
+    <!-- ═══ HUD HAUT GAUCHE : Profil ═══ -->
+    <div id="profileCard">
+        <div id="profileAvatar">
+            <div id="profileHead"></div>
+            <div id="profileBody"></div>
+        </div>
+        <div id="profileInfos">
+            <span id="playerName">Player</span>
+            <div id="xpBarWrap">
+                <div id="xpBar"></div>
+            </div>
+            <div id="playerAreaRow">
+                <div id="areaIcon"></div>
+                <span id="playerArea">0</span>
+            </div>
+            <div id="playerScoreRow">
+                <span id="playerScore">0 pts</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ HUD HAUT CENTRE : Monnaie ═══ -->
+    <div id="moneyChip">
+        <span id="moneyCoin">◈</span>
+        <span id="moneyText">0</span>
+    </div>
+
+    <!-- ═══ HUD DROITE : Boutons verticaux ═══ -->
+    <nav id="rightMenu">
+        <button class="sideBtn" id="BtnShop" title="Boutique">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+            <span class="sideBtnLabel">Shop</span>
+        </button>
+        <button class="sideBtn" id="BtnFriends" title="Amis">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            <span class="sideBtnLabel">Amis</span>
+        </button>
+        <button class="sideBtn" id="BtnClub" title="Clan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <span class="sideBtnLabel">Clan</span>
+        </button>
+        <button class="sideBtn" id="BtnLeague" title="Classement">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 20 18 10"/><polyline points="12 20 12 4"/><polyline points="6 20 6 14"/></svg>
+            <span class="sideBtnLabel">Top</span>
+        </button>
+    </nav>
+
+    <!-- ═══ HUD GAUCHE : Daily Streak ═══ -->
+    <div id="dailyStreak">
+        <div id="dailyIconWrap">
+            <svg id="dailyCalIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <span id="dailyFlame">🔥</span>
+        </div>
+        <div id="dailyInfos">
+            <span id="dailyLabel">Daily Streak</span>
+            <span id="dailyCount">§ jours</span>
+        </div>
+        <div id="dailyBadge">+§</div>
+    </div>
+
+    <!-- ═══ HUD BAS GAUCHE : Bouton recentrer ═══ -->
+    <button id="BtnCenter">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="3"/>
+            <line x1="12" y1="2" x2="12" y2="6"/>
+            <line x1="12" y1="18" x2="12" y2="22"/>
+            <line x1="2" y1="12" x2="6" y2="12"/>
+            <line x1="18" y1="12" x2="22" y2="12"/>
+        </svg>
+    </button>
+
+    <!-- ═══ HUD BAS : Mode + RUN/STOP + XP ═══ -->
+    <div id="bottomBar">
+
+        <!-- Mode de jeu -->
+        <button id="BtnMode">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+            </svg>
+            <span id="modeLabel">Solo</span>
+        </button>
+
+        <!-- Zone centrale RUN / STOP (superposés, switch par opacité) -->
+        <div id="btnRunStop">
+            <button id="BtnStart">
+                <svg class="runIcon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+                <span>RUN</span>
+                <div class="btnPulse"></div>
+            </button>
+            <button id="BtnStop">
+                <svg class="runIcon" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+                <span>STOP</span>
+            </button>
+        </div>
+
+        <!-- XP -->
+        <button id="BtnXp">
+            <img src="assets/images/XP_nobg.png" alt="XP" id="ImgXp">
+            <div id="xpGlow"></div>
+        </button>
+
+    </div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/sync.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
