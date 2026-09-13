@@ -271,7 +271,12 @@ function checkCloseZone(currentPoint) {
     }
 }
 
-// Croisement entre le tracé en cours et une zone déjà existante
+// Croisement entre le tracé en cours et SA PROPRE zone déjà existante.
+// Les zones ennemies ne déclenchent jamais de fermeture au simple contact —
+// on peut traverser le territoire adverse librement, comme un terrain
+// normal. C'est la forme finale de la boucle (fermée en rentrant chez soi
+// ou par auto-croisement) qui capture le territoire adverse chevauché,
+// géré côté serveur (insert_zone), indépendamment du trajet parcouru.
 function checkZoneIntersection(currentPoint) {
     const newStart = coords[coords.length - 1];
     const newEnd = currentPoint;
@@ -279,10 +284,10 @@ function checkZoneIntersection(currentPoint) {
     for (let i = 0; i < zones.length; i++) {
         const zone = zones[i];
 
-        // Si ce tracé n'est pas parti de son propre territoire, on ignore
-        // complètement ses propres zones : les traverser ne doit rien
-        // déclencher, comme si elles n'existaient pas pour ce trajet-là.
-        if (zone.owner === "player" && !traceOriginatesFromOwnTerritory) continue;
+        // On ignore toute zone qui n'est pas la sienne, et sa propre zone
+        // si ce tracé n'en est pas parti (voir traceOriginatesFromOwnTerritory).
+        if (zone.owner !== "player") continue;
+        if (!traceOriginatesFromOwnTerritory) continue;
 
         const zonePoints = zone.points;
         for (let j = 0; j < zonePoints.length; j++) {
