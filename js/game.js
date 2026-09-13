@@ -412,19 +412,21 @@ function closeZone(points) {
     resetTraceAfterCapture();
 
     const area = calculatePolygonArea(points);
-    playerTotalArea += area;
-    playerScore += Math.round(area / M2_PER_POINT);
 
     const layer = L.polygon(points, {
         color: colorForIndex(currentColorIndex),
         fillOpacity: 0.4,
     }).addTo(map);
 
-    const newZoneObj = { id: `player_${Date.now()}`, owner: "player", points, layer };
+    const newZoneObj = { id: `player_${Date.now()}`, owner: "player", points, area, layer };
     zones.push(newZoneObj);
 
-    updateAreaDisplay(playerTotalArea);
-    updateScoreDisplay(playerScore);
+    // Le score/surface affichés sont toujours recalculés depuis les zones
+    // réellement possédées (voir recalculatePlayerStatsFromZones), jamais
+    // juste incrémentés en mémoire — ça évite qu'ils se désynchronisent de
+    // la réalité (ex: après un rechargement de page, ou si une capture
+    // distante change ce qu'on possède).
+    recalculatePlayerStatsFromZones();
 
     // Fait correspondre l'id local au véritable id renvoyé par le serveur,
     // pour que les futurs événements temps réel (ex: quelqu'un découpe cette
@@ -432,6 +434,24 @@ function closeZone(points) {
     saveZoneToSupabase(points, area).then(realId => {
         if (realId) newZoneObj.id = realId;
     });
+}
+
+// Recalcule le score et la surface totale du joueur à partir des zones qu'il
+// possède ACTUELLEMENT (source de vérité : le tableau zones, synchronisé
+// avec la base). Appelée à chaque changement de zones — chargement initial
+// d'une session, capture personnelle, ou capture/découpe distante en temps
+// réel — pour que l'affichage ne se désynchronise jamais de la réalité.
+function recalculatePlayerStatsFromZones() {
+    let total = 0;
+    for (let i = 0; i < zones.length; i++) {
+        if (zones[i].owner === "player") {
+            total += zones[i].area || 0;
+        }
+    }
+    playerTotalArea = total;
+    playerScore = Math.round(total / M2_PER_POINT);
+    updateAreaDisplay(playerTotalArea);
+    updateScoreDisplay(playerScore);
 }
 
 // Vide le tracé en cours après une capture, sans toucher à isRunning ni à
