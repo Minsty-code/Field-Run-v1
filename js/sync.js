@@ -83,6 +83,11 @@ async function loadAllZonesFromSupabase() {
     }
 
     data.forEach(row => addRemoteZoneToMap(row));
+
+    // Recalcule le score/surface une fois toutes les zones chargées — c'est
+    // ça qui corrige le score qui "disparaissait" après un rechargement de
+    // page : avant, il n'était jamais réévalué au démarrage d'une session.
+    recalculatePlayerStatsFromZones();
 }
 
 // Ajoute une zone (venant de la base) sur la carte, sauf si elle y est déjà
@@ -115,6 +120,7 @@ function addRemoteZoneToMap(row) {
         id: row.id,
         owner: isMine ? "player" : row.owner_id,
         points: latLngPoints,
+        area: row.area_m2,
         layer: layer,
     });
 }
@@ -139,7 +145,12 @@ function subscribeToZoneRealtime() {
             { event: "INSERT", schema: "public", table: "zones" },
             (payload) => {
                 fetchSingleZoneGeoJSON(payload.new.id).then(geoRow => {
-                    if (geoRow) addRemoteZoneToMap(geoRow);
+                    if (geoRow) {
+                        addRemoteZoneToMap(geoRow);
+                        // Une capture (la nôtre ou celle de quelqu'un
+                        // d'autre) peut changer ce qu'on possède réellement.
+                        recalculatePlayerStatsFromZones();
+                    }
                 });
             }
         )
@@ -149,6 +160,7 @@ function subscribeToZoneRealtime() {
             (payload) => {
                 // Ses éventuels restes arrivent séparément via un événement INSERT.
                 removeZoneById(payload.old.id);
+                recalculatePlayerStatsFromZones();
             }
         )
         .subscribe();
