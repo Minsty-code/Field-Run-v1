@@ -15,13 +15,13 @@ function initMap() {
         zoomControl: false,
     }).setView([0, 0], 13);
 
-    // Tuiles OpenStreetMap standard — gratuites, sans clé API requise.
-    // (Les tuiles CartoDB Voyager utilisées avant demandent désormais une
-    // clé API côté CARTO ; à revoir plus tard si tu veux retrouver ce style
-    // plus soigné, via un compte CARTO/Mapbox/Stadia gratuit.)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        subdomains: 'abc',
+    // Tuiles Esri World Street Map — gratuites, sans clé API requise, rendu
+    // plus soigné qu'OSM standard (hiérarchie des routes/bâtiments plus
+    // lisible). Je ne peux pas garantir que ça restera gratuit indéfiniment
+    // (CartoDB, utilisé avant, a fini par exiger une clé) — si ça recasse un
+    // jour, remplacer juste l'URL et l'attribution ci-dessous suffit.
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P',
         maxZoom: 19
     }).addTo(map);
 }
