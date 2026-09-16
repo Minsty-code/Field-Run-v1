@@ -53,14 +53,19 @@ html, body {
     inset: 0;
     z-index: 1;
 }
-/* Carte bien foncée/normale */
+/* Habillage néon de la carte : inversion + rotation de teinte pour pousser
+   les couleurs naturelles de la carte (eau bleue, parcs verts) vers l'or et
+   le violet de la charte du jeu, sans dépendre d'un fournisseur de tuiles à
+   part (qui demanderait presque à coup sûr une clé API, comme CartoDB
+   avant). Valeurs vérifiées par simulation avant mise en place — mais le
+   rendu réel sur de vraies tuiles peut différer légèrement : à ajuster si besoin. */
 .leaflet-tile {
-    filter: brightness(0.60) saturate(0.85) contrast(1.05) !important;
+    filter: invert(1) hue-rotate(38deg) saturate(2.4) brightness(0.95) contrast(1.15) !important;
     transition: filter 0.4s ease;
 }
 
 body.game-running .leaflet-tile {
-    filter: brightness(1) saturate(1) contrast(1) !important;
+    filter: invert(1) hue-rotate(38deg) saturate(2.6) brightness(1.1) contrast(1.2) !important;
 }
 
 /* ════════════════════════
