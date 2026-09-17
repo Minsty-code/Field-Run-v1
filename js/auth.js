@@ -25,11 +25,6 @@ let currentColorIndex = 0;
 
 let authMode = "login"; // "login" ou "signup"
 
-// Email/pseudo en attente de confirmation par code (le temps que le joueur
-// tape le code reçu par email)
-let pendingSignupEmail = null;
-let pendingSignupUsername = null;
-
 
 //====================
 // Initialisation : vérifie si une session existe déjà
@@ -87,11 +82,8 @@ function clearAuthError() {
     el.style.display = "none";
 }
 
-// Bascule entre "Connexion" et "Créer un compte"
-function switchAuthMode() {
-    authMode = authMode === "login" ? "signup" : "login";
-    clearAuthError();
-
+// Met à jour l'affichage du formulaire selon authMode, sans le faire basculer
+function applyAuthModeUI() {
     const usernameField = document.getElementById("authUsername");
     const submitBtn = document.getElementById("authSubmitBtn");
     const switchText = document.getElementById("authSwitchText");
@@ -108,6 +100,13 @@ function switchAuthMode() {
 
     // Le lien a été recréé dans le innerHTML, il faut réattacher son événement
     document.getElementById("authSwitchLink").addEventListener("click", switchAuthMode);
+}
+
+// Bascule entre "Connexion" et "Créer un compte"
+function switchAuthMode() {
+    authMode = authMode === "login" ? "signup" : "login";
+    clearAuthError();
+    applyAuthModeUI();
 }
 
 
@@ -141,6 +140,8 @@ async function handleAuthSubmit() {
     submitBtn.textContent = authMode === "signup" ? "Créer mon compte" : "Connexion";
 }
 
+// Inscription — compatible avec le mail de confirmation PAR DÉFAUT de
+// Supabase (un lien à cliquer, pas un code à saisir).
 async function handleSignUp(email, password, username) {
     if (!username) {
         showAuthError("Choisis un pseudo.");
@@ -155,35 +156,25 @@ async function handleSignUp(email, password, username) {
     }
 
     if (data.session) {
-        // Confirmation par email désactivée : session immédiate
+        // Confirmation par email désactivée côté Supabase : session immédiate
         await completeSignup(data.user.id, username);
         return;
     }
 
-    // Pas de session immédiate à ce stade : soit une confirmation est
-    // réellement nécessaire, soit Supabase a renvoyé une réponse "neutre"
-    // sans session ni erreur (ex: ce compte existait déjà en attente de
-    // confirmation avant qu'elle soit désactivée). Dans le doute, on tente
-    // directement une connexion avec les identifiants qu'on vient de saisir
-    // plutôt que de bloquer sur un code qui n'a peut-être jamais été envoyé.
-    const { data: loginData } = await supabaseClient.auth.signInWithPassword({ email, password });
-
-    if (loginData && loginData.session) {
-        await completeSignup(loginData.user.id, username);
-        return;
-    }
-
-    // La connexion directe n'a pas marché non plus : là, un code est
-    // vraiment nécessaire.
-    pendingSignupEmail = email;
-    pendingSignupUsername = username;
-    showCodeScreen();
+    // Pas de session immédiate : la confirmation par email est active. On ne
+    // bloque sur rien côté app — Supabase envoie son lien de confirmation
+    // par défaut ; une fois cliqué, le joueur revient simplement se
+    // connecter normalement avec son mot de passe.
+    showAuthError("Compte créé ! Va voir tes emails (et les spams), clique sur le lien de confirmation, puis reviens te connecter ici avec ton mot de passe.");
+    authMode = "login";
+    applyAuthModeUI();
+    document.getElementById("authEmail").value = email;
 }
 
-// Crée le profil (username, couleur) et démarre le jeu — appelée soit juste
-// après l'inscription (si la confirmation email est désactivée), soit après
-// validation du code à 6 chiffres (si elle est activée). Robuste au cas où
-// un profil existe déjà pour ce compte (ex: une tentative précédente).
+// Crée le profil (username, couleur) et démarre le jeu — appelée juste après
+// l'inscription quand la confirmation email est désactivée, ou après une
+// connexion classique. Robuste au cas où un profil existe déjà pour ce
+// compte (ex: une tentative d'inscription précédente).
 async function completeSignup(userId, username) {
     let profileData = await fetchProfile(userId);
 
@@ -206,63 +197,7 @@ async function completeSignup(userId, username) {
     currentColorIndex = profileData ? profileData.color_index : 0;
 
     hideAuthScreen();
-    hideCodeScreen();
     startGameAfterAuth(currentUsername);
-}
-
-// Vérifie le code à 6 chiffres reçu par email
-async function handleCodeSubmit() {
-    clearAuthError();
-
-    const code = document.getElementById("authCode").value.trim();
-    if (!code) {
-        showAuthError("Entre le code reçu par email.");
-        return;
-    }
-
-    const submitBtn = document.getElementById("authCodeSubmitBtn");
-    submitBtn.disabled = true;
-    submitBtn.textContent = "…";
-
-    const { data, error } = await supabaseClient.auth.verifyOtp({
-        email: pendingSignupEmail,
-        token: code,
-        type: "signup",
-    });
-
-    submitBtn.disabled = false;
-    submitBtn.textContent = "Confirmer";
-
-    if (error) {
-        showAuthError("Code invalide ou expiré. Vérifie et réessaie.");
-        return;
-    }
-
-    await completeSignup(data.user.id, pendingSignupUsername);
-}
-
-// Renvoie un nouveau code si le joueur ne l'a pas reçu / l'a laissé expirer
-async function handleResendCode() {
-    clearAuthError();
-    if (!pendingSignupEmail) return;
-
-    const { error } = await supabaseClient.auth.resend({
-        type: "signup",
-        email: pendingSignupEmail,
-    });
-
-    showAuthError(error ? traduireErreur(describeError(error)) : "Nouveau code envoyé !");
-}
-
-// Affiche/masque l'écran de saisie du code (par-dessus le formulaire habituel)
-function showCodeScreen() {
-    document.getElementById("authForm").style.display = "none";
-    document.getElementById("authCodeForm").style.display = "flex";
-    clearAuthError();
-}
-function hideCodeScreen() {
-    document.getElementById("authCodeForm").style.display = "none";
-    document.getElementById("authForm").style.display = "flex";
 }
 
 async function handleLogin(email, password) {
@@ -273,18 +208,13 @@ async function handleLogin(email, password) {
         return;
     }
 
-    const profile = await fetchProfile(data.user.id);
-    currentUserId = data.user.id;
-    currentUsername = profile ? profile.username : null;
-    currentColorIndex = profile ? profile.color_index : 0;
-
-    hideAuthScreen();
-    startGameAfterAuth(currentUsername);
+    await completeSignup(data.user.id, null);
 }
 
 // Traduit les messages d'erreur Supabase les plus courants en français
 function traduireErreur(message) {
     if (message.includes("Invalid login credentials")) return "Email ou mot de passe incorrect.";
+    if (message.includes("Email not confirmed")) return "Confirme d'abord ton compte via le lien reçu par email.";
     if (message.includes("User already registered")) return "Un compte existe déjà avec cet email.";
     if (message.includes("Password should be at least")) return "Le mot de passe doit faire au moins 6 caractères.";
     return message;
@@ -318,12 +248,6 @@ function setupAuthFormListeners() {
     });
 
     document.getElementById("authPasswordToggle").addEventListener("click", togglePasswordVisibility);
-
-    document.getElementById("authCodeSubmitBtn").addEventListener("click", handleCodeSubmit);
-    document.getElementById("authResendLink").addEventListener("click", handleResendCode);
-    document.getElementById("authCode").addEventListener("keydown", (e) => {
-        if (e.key === "Enter") handleCodeSubmit();
-    });
 }
 
 // Bascule l'affichage en clair / masqué du mot de passe (utilisé aussi bien
