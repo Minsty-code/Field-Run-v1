@@ -7,13 +7,22 @@ document.addEventListener("DOMContentLoaded", () => {
     initMarker();
     initTrackingLine();
 
-    map.on('moveend', () => {
-        if (distance(lastPosition, [map.getCenter().lat, map.getCenter().lng]) < 3) {
-            isCentred = true;
-            hideCenterButton();
-        } else {
-            isCentred = false;
-            showCenterButton();
+    // On distingue le geste qui doit décentrer (glisser la carte à la main)
+    // du geste qui ne doit jamais décentrer (zoomer/dézoomer, même au pincé,
+    // qui peut légèrement déplacer le centre selon où on pince sans que ce
+    // soit une vraie intention de bouger la carte).
+    map.on('dragstart', () => {
+        isCentred = false;
+        showCenterButton();
+    });
+
+    map.on('zoomend', () => {
+        // Si on est censé être centré, on corrige tout dérapage du centre
+        // causé par le geste de zoom (le pincé zoome vers l'endroit touché,
+        // pas forcément vers le centre) — sans changer le niveau de zoom
+        // choisi, juste le centrage.
+        if (isCentred && lastPosition) {
+            map.panTo(lastPosition, { animate: false });
         }
     });
 
