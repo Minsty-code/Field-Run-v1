@@ -140,6 +140,18 @@ function onPositionUpdate(position) {
     }
 }
 
+// Normalise une différence de longitude (en degrés) dans [-180, 180].
+// Sans ça, deux points de part et d'autre de la ligne de changement de date
+// (ex: 179° et -179°, à peine 2° d'écart réel) donneraient un écart calculé
+// de 358° au lieu de 2° — faussant distances, croisements et détection de
+// territoire pour quiconque tracerait une boucle à cet endroit précis.
+function normalizeLonDiffDeg(diffDeg) {
+    let d = diffDeg;
+    while (d > 180) d -= 360;
+    while (d < -180) d += 360;
+    return d;
+}
+
 // Distance entre deux points GPS, en mètres (formule de Haversine)
 function distance(point1, point2) {
     const lat1 = point1[0];
@@ -150,7 +162,7 @@ function distance(point1, point2) {
     const R = 6371000; // rayon de la Terre (m)
 
     const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const dLon = normalizeLonDiffDeg(lon2 - lon1) * Math.PI / 180;
 
     const a =
         Math.sin(dLat / 2) * Math.sin(dLat / 2) +
@@ -210,10 +222,17 @@ function checkIntersection(currentPoint) {
 
 // Intersection entre deux segments [p1,p2] (existant) et [q1,q2] (nouveau)
 function segmentIntersection(p1, p2, q1, q2) {
-    const s1x = p2[0] - p1[0];
-    const s1y = p2[1] - p1[1];
-    const s2x = q2[0] - q1[0];
-    const s2y = q2[1] - q1[1];
+    // Déroule les longitudes de p2/q1/q2 par rapport à p1 : ça évite qu'un
+    // segment traversant la ligne de changement de date soit interprété
+    // comme un saut de centaines de degrés au lieu de quelques mètres.
+    const p2u = [p2[0], p1[1] + normalizeLonDiffDeg(p2[1] - p1[1])];
+    const q1u = [q1[0], p1[1] + normalizeLonDiffDeg(q1[1] - p1[1])];
+    const q2u = [q2[0], p1[1] + normalizeLonDiffDeg(q2[1] - p1[1])];
+
+    const s1x = p2u[0] - p1[0];
+    const s1y = p2u[1] - p1[1];
+    const s2x = q2u[0] - q1u[0];
+    const s2y = q2u[1] - q1u[1];
 
     const denom = (-s2x * s1y + s1x * s2y);
 
@@ -231,8 +250,8 @@ function segmentIntersection(p1, p2, q1, q2) {
     const normalizedDenom = Math.abs(denom) / (s1Length * s2Length);
     if (normalizedDenom < 0.000001) return null; // vraiment parallèles
 
-    const s = (-s1y * (p1[0] - q1[0]) + s1x * (p1[1] - q1[1])) / denom;
-    const t = (s2x * (p1[1] - q1[1]) - s2y * (p1[0] - q1[0])) / denom;
+    const s = (-s1y * (p1[0] - q1u[0]) + s1x * (p1[1] - q1u[1])) / denom;
+    const t = (s2x * (p1[1] - q1u[1]) - s2y * (p1[0] - q1u[0])) / denom;
 
     if (s >= 0 && s <= 1 && t >= 0 && t <= 1) {
         return [p1[0] + (t * s1x), p1[1] + (t * s1y)];
@@ -255,10 +274,15 @@ function checkCloseZone(currentPoint) {
     // Cas 2 : auto-croisement du tracé
     const intersection = checkIntersection(currentPoint);
     if (intersection) {
-        // On ne garde que la vraie boucle : du point de croisement jusqu'à
-        // ce même point, en ignorant tout le tracé qui précède le croisement.
+        // La boucle capturée ne prend que le croisement -> le bout du tracé.
+        // Mais tout ce qui précède le croisement (le trajet qui a amené
+        // jusque-là) n'a servi à rien pour CETTE capture : on le garde comme
+        // tracé en cours plutôt que de l'effacer, pour pouvoir continuer et
+        // fermer une boucle plus grande ensuite (ex: une petite boucle en
+        // plein milieu d'un grand tour, sans perdre tout le grand tour).
         const loopPoints = [intersection.point, ...coords.slice(intersection.index + 1)];
-        closeZone(loopPoints);
+        const remainingTrace = [...coords.slice(0, intersection.index + 1), intersection.point];
+        closeZone(loopPoints, remainingTrace);
         return;
     }
 
@@ -309,9 +333,12 @@ function isPointInPolygon(point, polygonPoints) {
 
     for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
         const latI = polygonPoints[i][0];
-        const lonI = polygonPoints[i][1];
+        // Déroule la longitude de chaque sommet par rapport au point testé,
+        // pour ne pas confondre "traverser la ligne de changement de date"
+        // avec "faire le tour de la Terre".
+        const lonI = lon + normalizeLonDiffDeg(polygonPoints[i][1] - lon);
         const latJ = polygonPoints[j][0];
-        const lonJ = polygonPoints[j][1];
+        const lonJ = lon + normalizeLonDiffDeg(polygonPoints[j][1] - lon);
 
         const intersect =
             ((lonI > lon) !== (lonJ > lon)) &&
@@ -330,7 +357,7 @@ function distanceToSegment(point, segStart, segEnd) {
     const R = 6371000;
     const toLocalMeters = (p) => [
         R * (p[0] - segStart[0]) * Math.PI / 180,
-        R * (p[1] - segStart[1]) * Math.PI / 180 * Math.cos(segStart[0] * Math.PI / 180),
+        R * normalizeLonDiffDeg(p[1] - segStart[1]) * Math.PI / 180 * Math.cos(segStart[0] * Math.PI / 180),
     ];
 
     const [px, py] = toLocalMeters(point);
@@ -408,8 +435,22 @@ function calculatePolygonArea(points) {
 // (le serveur découpe les zones adverses chevauchées de façon atomique —
 // voir la fonction SQL insert_zone). Ne stoppe PAS la course : le joueur
 // continue à courir immédiatement après, sur un tracé tout neuf.
-function closeZone(points) {
+// remainingTrace (optionnel) : portion du tracé qui n'a pas servi à cette
+// capture et qui doit continuer à être suivie (voir Cas 2 dans checkCloseZone).
+function closeZone(points, remainingTrace) {
+    // L'origine du tracé (parti de son territoire ou pas) reste la même
+    // pour la portion restante — elle vient du même trajet, juste tronqué.
+    const preservedOrigin = traceOriginatesFromOwnTerritory;
+
     resetTraceAfterCapture();
+
+    if (remainingTrace && remainingTrace.length >= 2) {
+        coords = remainingTrace;
+        firstPoint = [...remainingTrace[0]];
+        firstTracingFix = false;
+        traceOriginatesFromOwnTerritory = preservedOrigin;
+        updateLine(coords);
+    }
 
     const area = calculatePolygonArea(points);
 
