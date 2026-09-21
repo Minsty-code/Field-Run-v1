@@ -164,12 +164,47 @@
 
     </div>
 
+    <!-- ═══ Panneau "Mode de jeu" (marche/course, vélo, interrupteur de test) ═══ -->
+    <div id="modePanel">
+        <div id="modePanelContent">
+            <div id="modePanelHeader">
+                <span>Mode de jeu</span>
+                <button id="modePanelClose">&times;</button>
+            </div>
+
+            <button id="modeOptionCourse" class="modeOption active">
+                <span class="modeOptionTitle">Marche / Course</span>
+                <span class="modeOptionLimit">Limite : 15 km/h</span>
+            </button>
+            <button id="modeOptionVelo" class="modeOption">
+                <span class="modeOptionTitle">Vélo</span>
+                <span class="modeOptionLimit">Limite : 30 km/h</span>
+            </button>
+
+            <div id="modePanelTestRow">
+                <label id="speedLimitTestLabel">
+                    <input type="checkbox" id="speedLimitTestToggle">
+                    Anti-triche vitesse (test)
+                </label>
+                <span id="modePanelTestHint">Pour tes phases de test — s'applique partout tant que c'est activé.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Anti-triche vitesse : retour visuel ═══ -->
+    <div id="speedPenaltyOverlay"></div>
+    <div id="speedPenaltySign">
+        <div id="speedPenaltyNumber">5</div>
+    </div>
+    <div id="speedCutoffToast"></div>
+
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="js/auth.js"></script>
     <script src="js/sync.js"></script>
     <script src="js/map.js"></script>
     <script src="js/game.js"></script>
+    <script src="js/anticheat.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/main.js"></script>
 </body>
