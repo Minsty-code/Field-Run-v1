@@ -60,6 +60,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // appelle startGameAfterAuth() dès qu'une session valide existe.
     initAuth();
 
+    setupModePanelListeners();
+
     // Bouton de déconnexion provisoire : recharger la page après
     // déconnexion est le moyen le plus simple et sûr de repartir sur une
     // base propre (zones, coords, marqueurs).
