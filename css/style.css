@@ -865,3 +865,169 @@ body.game-running .leaflet-tile {
     font-family: "Barlow", sans-serif;
     cursor: pointer;
 }
+
+/* ════════════════════════
+   ANTI-TRICHE VITESSE
+════════════════════════ */
+
+/* Panneau "Mode de jeu" */
+#modePanel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 4000;
+    background: rgba(0,0,0,0.6);
+    align-items: flex-end;
+    justify-content: center;
+}
+#modePanelContent {
+    width: 100%;
+    max-width: 420px;
+    background: var(--dark3, #16161d);
+    border: 1px solid var(--glassb, rgba(255,255,255,0.08));
+    border-radius: 20px 20px 0 0;
+    padding: 20px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+#modePanelHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #fff;
+    font-family: "Barlow", sans-serif;
+    font-weight: 800;
+    font-size: 17px;
+    margin-bottom: 4px;
+}
+#modePanelClose {
+    background: transparent;
+    border: none;
+    color: var(--textdim, #999);
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+}
+.modeOption {
+    width: 100%;
+    text-align: left;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.modeOption.active {
+    border-color: var(--gold);
+    background: rgba(240,201,0,0.08);
+}
+.modeOptionTitle {
+    color: #fff;
+    font-family: "Barlow", sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+}
+.modeOptionLimit {
+    color: var(--textdim, #999);
+    font-size: 12.5px;
+}
+#modePanelTestRow {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+#speedLimitTestLabel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #fff;
+    font-family: "Barlow", sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+}
+#modePanelTestHint {
+    color: var(--textdim, #999);
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+/* Overlay de pénalité (teinte ambrée/rouge, intensité pilotée en JS) */
+#speedPenaltyOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2500;
+    pointer-events: none;
+    transition: background 0.3s ease;
+}
+
+/* Panneau rond façon panneau de limitation, revisité Field Run */
+#speedPenaltySign {
+    display: none;
+    position: fixed;
+    top: 42%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2600;
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #1a1a22 55%, var(--dark) 100%);
+    border: 7px solid var(--gold);
+    box-shadow: 0 0 36px rgba(240,201,0,0.45), inset 0 0 18px rgba(235,0,205,0.25);
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    animation: speedPenaltyPulse 1.6s ease-in-out infinite;
+}
+#speedPenaltyNumber {
+    font-family: "RushDriver", "Barlow", sans-serif;
+    font-size: 56px;
+    font-weight: 900;
+    color: var(--gold);
+    text-shadow: 0 0 14px rgba(240,201,0,0.55);
+}
+@keyframes speedPenaltyPulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.06); }
+}
+
+/* Message de coupure (toast) */
+#speedCutoffToast {
+    position: fixed;
+    top: 16%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2700;
+    background: rgba(20,20,24,0.94);
+    border: 1px solid var(--gold);
+    color: #fff;
+    padding: 13px 20px;
+    border-radius: 12px;
+    font-family: "Barlow", sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    text-align: center;
+    max-width: 82vw;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+}
+#speedCutoffToast.visible {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #speedPenaltySign {
+        animation: none;
+    }
+}
