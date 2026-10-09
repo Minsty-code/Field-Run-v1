@@ -53,6 +53,10 @@ function recordSpeedSample(point, timeMs, accuracy) {
     const applies = speedLimitTestEnabled && isRunning && coords.length > 0;
 
     if (!applies) {
+        const why = !speedLimitTestEnabled ? "interrupteur de test désactivé"
+            : !isRunning ? "course non lancée (appuie sur RUN)"
+            : "pas encore de tracé (sors de ta zone / avance)";
+        updateSpeedDebug(`INACTIF — ${why}`);
         if (speedPenaltyTimer > 0) {
             speedPenaltyTimer = 0;
             hideSpeedPenaltyUI();
@@ -62,6 +66,15 @@ function recordSpeedSample(point, timeMs, accuracy) {
     }
 
     const speedKmh = computeCurrentSpeedKmh();
+
+    const accText = accuracy == null ? "?" : Math.round(accuracy) + " m";
+    const validCount = speedSamples.filter(s => s.accuracy == null || s.accuracy <= MIN_GPS_ACCURACY_METERS).length;
+    updateSpeedDebug(
+        `ACTIF — précision GPS : ${accText} (ignorée si > ${MIN_GPS_ACCURACY_METERS} m) · ` +
+        `points fiables : ${validCount} · ` +
+        `vitesse : ${speedKmh === null ? "— (pas assez de points fiables)" : speedKmh.toFixed(1) + " km/h"} · ` +
+        `limite : ${currentSpeedLimitKmh()} km/h · chrono : ${speedPenaltyTimer.toFixed(1)} s`
+    );
 
     if (lastSpeedCheckTime === null) {
         lastSpeedCheckTime = timeMs;
@@ -122,6 +135,13 @@ function computeCurrentSpeedKmh() {
 
     const speedMs = totalDistance / elapsedSeconds;
     return speedMs * 3.6; // m/s -> km/h
+}
+
+// Diagnostic TEMPORAIRE affiché dans le panneau de mode (à retirer une fois
+// la limite validée sur le terrain).
+function updateSpeedDebug(text) {
+    const el = document.getElementById('speedDebugLine');
+    if (el) el.textContent = "Diagnostic : " + text;
 }
 
 // Annule le tracé en cours pour excès de vitesse — la course, elle, continue.
@@ -186,6 +206,14 @@ function openModePanel() {
 function closeModePanel() {
     document.getElementById('modePanel').style.display = 'none';
 }
+function toggleModePanel() {
+    const panel = document.getElementById('modePanel');
+    if (panel.style.display === 'flex') {
+        closeModePanel();
+    } else {
+        openModePanel();
+    }
+}
 
 function setGameSpeedMode(mode) {
     gameSpeedMode = mode;
@@ -196,7 +224,10 @@ function setGameSpeedMode(mode) {
 }
 
 function setupModePanelListeners() {
-    document.getElementById('BtnMode').addEventListener('click', openModePanel);
+    // Le bouton affiche le vrai mode actif dès le départ (pas un "Solo" figé)
+    setGameSpeedMode(gameSpeedMode);
+
+    document.getElementById('BtnMode').addEventListener('click', toggleModePanel);
     document.getElementById('modePanelClose').addEventListener('click', closeModePanel);
 
     document.getElementById('modeOptionCourse').addEventListener('click', () => setGameSpeedMode("course"));
