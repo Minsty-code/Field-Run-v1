@@ -875,7 +875,7 @@ body.game-running .leaflet-tile {
     display: none;
     position: fixed;
     inset: 0;
-    z-index: 4000;
+    z-index: 9500;
     background: rgba(0,0,0,0.6);
     align-items: flex-end;
     justify-content: center;
@@ -885,8 +885,12 @@ body.game-running .leaflet-tile {
     max-width: 420px;
     background: var(--dark3, #16161d);
     border: 1px solid var(--glassb, rgba(255,255,255,0.08));
-    border-radius: 20px 20px 0 0;
-    padding: 20px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+    border-radius: 20px;
+    /* La barre de boutons du bas (70px de haut, à 28px du bord) ne doit
+       jamais chevaucher le panneau : on laisse ~120px sous lui pour qu'il
+       flotte clairement au-dessus. */
+    margin-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+    padding: 20px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -1030,4 +1034,17 @@ body.game-running .leaflet-tile {
     #speedPenaltySign {
         animation: none;
     }
+}
+
+/* Diagnostic TEMPORAIRE de la limite de vitesse — à retirer une fois validée */
+#speedDebugLine {
+    font-family: monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #00FF88;
+    background: rgba(0,0,0,0.5);
+    border: 1px dashed rgba(0,255,136,0.4);
+    border-radius: 8px;
+    padding: 8px 10px;
+    word-break: break-word;
 }
