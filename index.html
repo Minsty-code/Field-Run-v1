@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Field Run</title>
     <link rel="icon" type="image/png" sizes="32x32" href="assets/images/logo.png">
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css">
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
 </head>
 <body>
 
@@ -183,7 +183,7 @@
 
             <div id="modePanelTestRow">
                 <label id="speedLimitTestLabel">
-                    <input type="checkbox" id="speedLimitTestToggle">
+                    <input type="checkbox" id="speedLimitTestToggle" autocomplete="off">
                     Anti-triche vitesse (test)
                 </label>
                 <span id="modePanelTestHint">Pour tes phases de test — s'applique partout tant que c'est activé.</span>
@@ -201,7 +201,7 @@
     </div>
     <div id="speedCutoffToast"></div>
 
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="js/auth.js"></script>
     <script src="js/sync.js"></script>
