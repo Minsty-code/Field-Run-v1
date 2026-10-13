@@ -50,6 +50,12 @@ function recordSpeedSample(point, timeMs, accuracy) {
     const cutoff = timeMs - SPEED_WINDOW_SECONDS * 1000;
     speedSamples = speedSamples.filter(s => s.time >= cutoff);
 
+    // La case à cocher fait foi, lue à chaque position : le navigateur peut
+    // restaurer une case déjà cochée après un rechargement SANS déclencher
+    // l'événement "change" — la variable restait alors à false pour toujours.
+    const testToggleEl = document.getElementById('speedLimitTestToggle');
+    if (testToggleEl) speedLimitTestEnabled = testToggleEl.checked;
+
     const applies = speedLimitTestEnabled && isRunning && coords.length > 0;
 
     if (!applies) {
@@ -234,6 +240,7 @@ function setupModePanelListeners() {
     document.getElementById('modeOptionVelo').addEventListener('click', () => setGameSpeedMode("velo"));
 
     const testToggle = document.getElementById('speedLimitTestToggle');
+    speedLimitTestEnabled = testToggle.checked;
     testToggle.addEventListener('change', () => {
         speedLimitTestEnabled = testToggle.checked;
         if (!speedLimitTestEnabled) {
