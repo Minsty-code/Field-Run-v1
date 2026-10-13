@@ -52,22 +52,8 @@ html, body {
     position: fixed;
     inset: 0;
     z-index: 1;
+    background: #05050C; /* l'espace autour du globe */
 }
-/* Habillage néon de la carte : inversion + rotation de teinte pour pousser
-   les couleurs naturelles de la carte (eau bleue, parcs verts) vers l'or et
-   le violet de la charte du jeu, sans dépendre d'un fournisseur de tuiles à
-   part (qui demanderait presque à coup sûr une clé API, comme CartoDB
-   avant). Valeurs vérifiées par simulation avant mise en place — mais le
-   rendu réel sur de vraies tuiles peut différer légèrement : à ajuster si besoin. */
-.leaflet-tile {
-    filter: invert(1) hue-rotate(38deg) saturate(2.4) brightness(0.95) contrast(1.15) !important;
-    transition: filter 0.4s ease;
-}
-
-body.game-running .leaflet-tile {
-    filter: invert(1) hue-rotate(38deg) saturate(2.6) brightness(1.1) contrast(1.2) !important;
-}
-
 /* ════════════════════════
    LOADER
 ════════════════════════ */
@@ -546,7 +532,6 @@ body.game-running .leaflet-tile {
 ════════════════════════ */
 .playerDot {
     width: 32px; height: 32px;
-    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -568,26 +553,17 @@ body.game-running .leaflet-tile {
 }
 
 /* ════════════════════════
-   LEAFLET OVERRIDES
+   MAPLIBRE OVERRIDES
 ════════════════════════ */
-
-.leaflet-control-container {
-    box-shadow: none !important;
-    outline: 0 !important;
+.maplibregl-ctrl-attrib {
+    background: rgba(8, 8, 16, 0.7) !important;
+    color: var(--textdim);
 }
-
-.leaflet-bar {
-    box-shadow: none;
+.maplibregl-ctrl-attrib a {
+    color: var(--textdim);
 }
-
-.leaflet-bar a, .leaflet-bar a:hover {
-    background-color: #f0b034;
-    border: 1px solid #065428;
-}
-
-.leaflet-bar a:first-child, .leaflet-bar a:last-child {
-    border-radius: 0;
-    border-bottom: 1px solid #065428;
+.maplibregl-ctrl-bottom-right {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ════════════════════════
