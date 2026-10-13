@@ -25,6 +25,32 @@ const zoneFeatures = new Map();       // clé interne -> Feature GeoJSON
 let zoneKeyCounter = 0;
 let zonesRefreshQueued = false;
 
+// ── Diagnostic à l'écran ───────────────────
+// Sur téléphone il n'y a pas de console : toute erreur JS ou de carte
+// s'affiche dans un bandeau rouge en haut de l'écran.
+// TEMPORAIRE — à retirer une fois la carte validée.
+function showMapDebug(text) {
+    let el = document.getElementById('mapDebugBanner');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'mapDebugBanner';
+        el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100000;padding:10px 12px;' +
+            'background:rgba(160,0,40,0.92);color:#fff;font:11px/1.4 monospace;white-space:pre-wrap;' +
+            'word-break:break-word;max-height:40vh;overflow:auto;pointer-events:none';
+        document.body.appendChild(el);
+    }
+    el.textContent += text + '\n';
+}
+
+window.addEventListener('error', (e) => {
+    showMapDebug('JS : ' + e.message + ' (' + String(e.filename || '').split('/').pop() + ':' + e.lineno + ')');
+});
+window.addEventListener('unhandledrejection', (e) => {
+    showMapDebug('Promesse : ' + ((e.reason && e.reason.message) || e.reason));
+});
+
+let mapErrorCount = 0;
+
 // ── Initialisation carte ───────────────────
 function initMap() {
     map = new maplibregl.Map({
@@ -45,7 +71,11 @@ function initMap() {
     setZoomAroundCenter(true);
 
     map.on('style.load', onStyleReady);
-    map.on('error', (e) => console.warn('Erreur carte :', e && e.error ? e.error.message : e));
+    map.on('error', (e) => {
+        const msg = e && e.error ? e.error.message : String(e);
+        console.warn('Erreur carte :', msg);
+        if (mapErrorCount++ < 3) showMapDebug('Carte : ' + msg);
+    });
 }
 
 // Zoom (pincement / molette) : autour du centre quand on suit le joueur, pour
@@ -88,12 +118,12 @@ function onStyleReady() {
 // On recolore le style OpenFreeMap couche par couche (par type et par nom)
 // plutôt que de dépendre d'un fournisseur de style sombre.
 function fillColorFor(id) {
-    if (/water/.test(id)) return '#1a0b3d';
+    if (/water/.test(id)) return '#2a1060';
     if (/ice|glacier/.test(id)) return '#14142a';
-    if (/park|wood|forest|grass|landcover|golf|pitch|garden|cemetery|nature|scrub|farm|wetland|sand|meadow|recreation/.test(id)) return '#0f1c1f';
-    if (/building/.test(id)) return '#1b1b2d';
+    if (/park|wood|forest|grass|landcover|golf|pitch|garden|cemetery|nature|scrub|farm|wetland|sand|meadow|recreation/.test(id)) return '#13262a';
+    if (/building/.test(id)) return '#222240';
     if (/aeroway|runway|taxiway/.test(id)) return '#1c1c2c';
-    return '#0d0d17';
+    return '#14142a';
 }
 
 function lineColorFor(id) {
@@ -119,7 +149,7 @@ function applyNeonTheme() {
 
         switch (layer.type) {
             case 'background':
-                setPaint('background-color', '#07070D');
+                setPaint('background-color', '#14142a');
                 break;
             case 'fill':
                 setPaint('fill-pattern', undefined);
