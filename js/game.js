@@ -37,8 +37,10 @@ const M2_PER_POINT = 10;      // 1 point = 10 m² (1 "hars")
 // recentrage pendant une course).
 // IDLE_ZOOM : vue plus rapprochée qu'avant, utilisée hors course (premier
 // centrage et recentrage hors course).
-const GAME_ZOOM = 19;
-const IDLE_ZOOM = 17;
+// Échelle MapLibre (tuiles 512 px) : un cran de moins que l'ancienne échelle
+// Leaflet pour la même vue (19 -> 18, 17 -> 16).
+const GAME_ZOOM = 18;
+const IDLE_ZOOM = 16;
 
 
 //====================
@@ -85,7 +87,7 @@ function onPositionUpdate(position) {
     // premier centrage (plus bas) et au clic sur le bouton de recentrage
     // (voir main.js).
     if (isCentred) {
-        map.panTo([lat, lon]);
+        mapPanTo([lat, lon]);
     }
 
     if (isRunning) {
@@ -139,9 +141,10 @@ function onPositionUpdate(position) {
     }
 
     if (map && firstMapFix) {
-        map.setView([lat, lon], isRunning ? GAME_ZOOM : IDLE_ZOOM);
-        firstMapFix = false;
+        // Vol d'introduction : de la Terre entière jusqu'au joueur
         hideLoader();
+        mapIntroFlight([lat, lon], isRunning ? GAME_ZOOM : IDLE_ZOOM);
+        firstMapFix = false;
     }
 }
 
@@ -459,12 +462,9 @@ function closeZone(points, remainingTrace) {
 
     const area = calculatePolygonArea(points);
 
-    const layer = L.polygon(points, {
-        color: colorForIndex(currentColorIndex),
-        fillOpacity: 0.4,
-    }).addTo(map);
+    const mapKey = addZoneToMap(points, colorForIndex(currentColorIndex));
 
-    const newZoneObj = { id: `player_${Date.now()}`, owner: "player", points, area, layer };
+    const newZoneObj = { id: `player_${Date.now()}`, owner: "player", points, area, mapKey };
     zones.push(newZoneObj);
 
     // Le score/surface affichés sont toujours recalculés depuis les zones
@@ -513,7 +513,7 @@ function resetTraceAfterCapture() {
 }
 
 // Convertit un anneau GeoJSON [lon, lat] (venant de Supabase) en points
-// [lat, lon] utilisables par Leaflet. Utilisée par sync.js.
+// [lat, lon] utilisables par la carte. Utilisée par sync.js.
 function toLatLngPoints(ring) {
     return ring.map(c => [c[1], c[0]]);
 }
@@ -529,7 +529,7 @@ function startTracking() {
         return;
     }
     isRunning = true;
-    map.setView(lastPosition, GAME_ZOOM);
+    mapSetView(lastPosition, GAME_ZOOM);
     firstTracingFix = true;
     firstPoint = null;
     recentlyNearOwnTerritory = false;
@@ -542,7 +542,7 @@ function stopTracking() {
     clearLine();
     isRunning = false;
     if (lastPosition) {
-        map.setView(lastPosition, IDLE_ZOOM);
+        mapSetView(lastPosition, IDLE_ZOOM);
     }
     updateButtonsUI(false);
     coords = [];
