@@ -111,17 +111,14 @@ function addRemoteZoneToMap(row) {
 
     const isMine = row.owner_id === currentUserId;
 
-    const layer = L.polygon(latLngPoints, {
-        color: colorForIndex(row.color_index),
-        fillOpacity: 0.4,
-    }).addTo(map);
+    const mapKey = addZoneToMap(latLngPoints, colorForIndex(row.color_index));
 
     zones.push({
         id: row.id,
         owner: isMine ? "player" : row.owner_id,
         points: latLngPoints,
         area: row.area_m2,
-        layer: layer,
+        mapKey: mapKey,
     });
 }
 
@@ -132,7 +129,7 @@ function removeZoneById(zoneId) {
     if (index === -1) return;
 
     const zone = zones[index];
-    if (zone.layer) map.removeLayer(zone.layer);
+    removeZoneFromMap(zone.mapKey);
     zones.splice(index, 1);
 }
 
