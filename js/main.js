@@ -51,8 +51,9 @@ document.addEventListener("DOMContentLoaded", () => {
     initAuth();
 
     setupModePanelListeners();
+    setupSettingsMenu();
 
-    // Bouton de déconnexion provisoire : recharger la page après
+    // Bouton de déconnexion (dans le menu Paramètres) : recharger la page après
     // déconnexion est le moyen le plus simple et sûr de repartir sur une
     // base propre (zones, coords, marqueurs).
     document.getElementById('BtnLogout').addEventListener('click', async () => {
