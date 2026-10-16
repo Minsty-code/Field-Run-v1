@@ -203,7 +203,7 @@ html, body {
 #moneyChip {
     position: fixed;
     top: 16px;
-    left: 75%;
+    left: calc(75% - 30px); /* laisse la place à l'engrenage à droite */
     transform: translateX(-50%);
     z-index: 9000;
 
@@ -845,21 +845,6 @@ html, body {
    BOUTON DÉCONNEXION — PROVISOIRE
    (à remplacer par un vrai menu plus tard)
 ════════════════════════ */
-#BtnLogout {
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    z-index: 3000;
-    background: rgba(0,0,0,0.6);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,0.3);
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-family: "Barlow", sans-serif;
-    cursor: pointer;
-}
-
 /* ════════════════════════
    ANTI-TRICHE VITESSE
 ════════════════════════ */
@@ -889,7 +874,8 @@ html, body {
     flex-direction: column;
     gap: 12px;
 }
-#modePanelHeader {
+#modePanelHeader,
+#settingsPanelHeader {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -899,7 +885,8 @@ html, body {
     font-size: 17px;
     margin-bottom: 4px;
 }
-#modePanelClose {
+#modePanelClose,
+#settingsPanelClose {
     background: transparent;
     border: none;
     color: var(--textdim, #999);
@@ -1041,4 +1028,106 @@ html, body {
     border-radius: 8px;
     padding: 8px 10px;
     word-break: break-word;
-       }
+}
+
+/* ════════════════════════
+   PARAMÈTRES
+════════════════════════ */
+#BtnSettings {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 9000;
+
+    width: 46px; height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: var(--glass);
+    backdrop-filter: var(--blur);
+    -webkit-backdrop-filter: var(--blur);
+    border: 1px solid var(--border);
+    border-radius: var(--rlg);
+    color: var(--textdim);
+    cursor: pointer;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+}
+#BtnSettings svg { width: 22px; height: 22px; }
+#BtnSettings:active { color: var(--gold); }
+
+#settingsPanel {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9500;
+    background: rgba(0,0,0,0.6);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+#settingsPanelContent {
+    width: 100%;
+    max-width: 420px;
+    max-height: 85vh;
+    overflow-y: auto;
+    background: var(--dark3, #16161d);
+    border: 1px solid var(--glassb, rgba(255,255,255,0.08));
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.settingsSectionTitle {
+    margin-top: 8px;
+    color: var(--textdim, #999);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+#settingsCredits {
+    margin: 0;
+    color: var(--textdim, #999);
+    font-size: 12px;
+    line-height: 1.7;
+}
+#settingsCredits a {
+    color: var(--gold);
+    text-decoration: none;
+}
+#BtnLogout {
+    width: 100%;
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(235, 0, 205, 0.1);
+    border: 1px solid rgba(235, 0, 205, 0.45);
+    color: #fff;
+    font-family: "Barlow", sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+/* ════════════════════════
+   MODES DE QUALITÉ (classes posées sur <body> par settings.js)
+   Graphique : tout actif. Équilibré : sans flou, animations décoratives
+   en pause. Performances : en plus, plus aucune animation en continu.
+════════════════════════ */
+body.q-equilibre *,
+body.q-performances * {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+}
+body.q-equilibre #dailyStreak,
+body.q-equilibre #dailyFlame,
+body.q-equilibre #xpGlow,
+body.q-performances #dailyStreak,
+body.q-performances #dailyFlame,
+body.q-performances #xpGlow,
+body.q-performances .btnPulse,
+body.q-performances .playerDotRing {
+    animation: none !important;
+}
