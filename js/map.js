@@ -214,8 +214,33 @@ function addGameLayers() {
 function initMarker() {
     const el = document.createElement('div');
     el.className = 'playerDot';
-    el.innerHTML = '<div class="playerDotCore"></div><div class="playerDotRing"></div>';
+    el.innerHTML = '<div class="playerDotCore"></div><div class="playerDotRing"></div>' +
+                   '<div class="playerSpeed" id="playerSpeed"></div>';
     currentMarker = new maplibregl.Marker({ element: el });
+
+    // Le GPS peut cesser d'envoyer des positions (arrêt, signal perdu) : sans
+    // ce contrôle, la dernière vitesse resterait affichée indéfiniment.
+    setInterval(() => {
+        if (lastSpeedUpdate && Date.now() - lastSpeedUpdate > 4000) showSpeedLabel('–');
+    }, 1000);
+}
+
+// ── Vitesse affichée au-dessus du point ────
+let lastSpeedUpdate = 0;
+
+function showSpeedLabel(text) {
+    const el = document.getElementById('playerSpeed');
+    if (!el) return;
+    el.textContent = text === '–' ? '– km/h' : text + ' km/h';
+    el.style.display = 'block';
+}
+
+// kmh : vitesse en km/h, ou null si pas assez de données fiables.
+function updateMarkerSpeed(kmh) {
+    lastSpeedUpdate = Date.now();
+    if (kmh == null) { showSpeedLabel('–'); return; }
+    // Sous 1 km/h : le GPS bouge tout seul à l'arrêt, on affiche 0 plutôt que du bruit
+    showSpeedLabel(kmh < 1 ? '0' : String(Math.round(kmh)));
 }
 
 function updateMarker(lat, lon) {
