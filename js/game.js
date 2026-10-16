@@ -80,6 +80,7 @@ function onPositionUpdate(position) {
     // course soit active ou non — la logique de pénalité se charge elle-même
     // de ne s'appliquer qu'au bon moment (course + tracé en cours).
     recordSpeedSample(currentPoint, position.timestamp || Date.now(), accuracy);
+    updateMarkerSpeed(computeCurrentSpeedKmh());
 
     // Si "centré", la carte suit la position — mais seulement la position,
     // jamais le zoom, pour ne jamais écraser un zoom manuel ou le fait de ne
@@ -546,4 +547,4 @@ function stopTracking() {
     }
     updateButtonsUI(false);
     coords = [];
-}
+        }
