@@ -75,6 +75,7 @@ function onPositionUpdate(position) {
     updateAccuracyCircle(lat, lon, accuracy);
     lastPosition = currentPoint;
     updateMarker(lat, lon);
+    maybeRefreshZonesAroundPlayer(currentPoint);
 
     // Anti-triche : alimente le suivi de vitesse à chaque position, que la
     // course soit active ou non — la logique de pénalité se charge elle-même
@@ -547,4 +548,4 @@ function stopTracking() {
     }
     updateButtonsUI(false);
     coords = [];
-        }
+    }
