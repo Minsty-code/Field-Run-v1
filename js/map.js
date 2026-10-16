@@ -64,9 +64,11 @@ function initMap() {
         dragRotate: false,         // carte toujours orientée nord en haut
         pitchWithRotate: false,
         touchPitch: false,
+        pixelRatio: effectivePixelRatio(),
+        fadeDuration: qualityPreset().fade,
     });
 
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+    // Les crédits de la carte sont dans le menu Paramètres (plus de contrôle sur la carte).
     map.touchZoomRotate.disableRotation();
     setZoomAroundCenter(true);
 
@@ -94,6 +96,7 @@ function onStyleReady() {
         console.warn('Projection globe indisponible :', e.message);
     }
 
+    removeClutterLayers();
     applyNeonTheme();
 
     // Halo d'atmosphère autour de la Terre (visible en dézoomant)
@@ -112,6 +115,11 @@ function onStyleReady() {
     refreshZonesSource();
     refreshTraceSource();
     refreshAccuracySource();
+
+    applyQualityToMap();
+    if (typeof lastPosition !== 'undefined' && lastPosition) {
+        prefetchTilesAround(lastPosition[0], lastPosition[1]);
+    }
 }
 
 // ── Habillage néon noir / or / violet ──────
@@ -245,6 +253,7 @@ function updateMarkerSpeed(kmh) {
 
 function updateMarker(lat, lon) {
     currentMarker.setLngLat([lon, lat]);
+    prefetchTilesAround(lat, lon);
     if (!markerOnMap) {
         currentMarker.addTo(map);
         markerOnMap = true;
@@ -273,6 +282,7 @@ function circlePolygon(lat, lon, radiusM, steps = 48) {
 }
 
 function updateAccuracyCircle(lat, lon, accuracy) {
+    if (!qualityPreset().accuracyCircle) return;
     const color = accuracy > 100 ? '#EB00CD' : '#F0C900';
     accuracyFeature = {
         type: 'Feature',
@@ -357,6 +367,12 @@ function refreshZonesSource() {
 // latlon : [lat, lon]. Suivi GPS passif : ne touche jamais au zoom.
 function mapPanTo(latlon) {
     if (!mapReady || introFlying) return;
+
+    // Zone morte : à l'arrêt, le bruit GPS bougerait la caméra en continu et
+    // forcerait la carte à se redessiner pour rien.
+    const c = map.getCenter();
+    if (distance([c.lat, c.lng], latlon) < qualityPreset().panThreshold) return;
+
     map.easeTo({ center: [latlon[1], latlon[0]], duration: 600, easing: t => t });
 }
 
@@ -375,4 +391,109 @@ function mapIntroFlight(latlon, zoom) {
     // Après flyTo : lancer un vol interrompt d'abord l'animation en cours (suivi GPS),
     // dont le "moveend" ne doit pas compter comme la fin du vol d'introduction.
     map.once('moveend', () => { introFlying = false; });
+}
+
+// ══════════════════════════════════════════
+//  Qualité, allègement du style, préchargement
+// ══════════════════════════════════════════
+
+function effectivePixelRatio() {
+    return Math.min(window.devicePixelRatio || 1, qualityPreset().maxPixelRatio);
+}
+
+// Appliqué au démarrage et à chaque changement de mode dans les Paramètres.
+function applyQualityToMap() {
+    if (!map) return;
+    const q = qualityPreset();
+
+    try { map.setPixelRatio(effectivePixelRatio()); } catch (e) { /* ancienne version : ignoré */ }
+    map._fadeDuration = q.fade; // pas de réglage public après création de la carte
+
+    if (mapReady) {
+        (map.getStyle().layers || []).forEach(layer => {
+            if (layer.type !== 'symbol') return;
+            try { map.setLayoutProperty(layer.id, 'visibility', q.labels ? 'visible' : 'none'); } catch (e) {}
+        });
+
+        if (!q.accuracyCircle) {
+            accuracyFeature = null;
+            refreshAccuracySource();
+        }
+    }
+}
+
+// Retire commerces, arrêts de bus et de transport, numéros de rue, panneaux
+// routiers, sens uniques et aéroports/sommets. Les routes, les bâtiments (3D
+// compris) et les noms de lieux et de rues restent. On ne touche qu'aux symboles.
+const CLUTTER_SOURCE_LAYERS = new Set(['poi', 'housenumber', 'aerodrome_label', 'mountain_peak']);
+const CLUTTER_ID_PATTERN = /poi|transit|housenumber|shield|oneway|aerialway|airport|mountain|peak/;
+
+function removeClutterLayers() {
+    (map.getStyle().layers || []).forEach(layer => {
+        if (layer.type !== 'symbol') return;
+        const id = layer.id.toLowerCase();
+        if (CLUTTER_SOURCE_LAYERS.has(layer['source-layer']) || CLUTTER_ID_PATTERN.test(id)) {
+            try { map.removeLayer(layer.id); } catch (e) {}
+        }
+    });
+}
+
+// ── Préchargement des tuiles autour du joueur ──
+// Au zoom de jeu, la carte n'utilise que des tuiles vectorielles de zoom 14
+// (~2 km de large). On télécharge les 3×3 autour du joueur dans le cache du
+// navigateur : en bougeant, MapLibre les retrouve sans attendre le réseau.
+// Rien n'est téléchargé loin du joueur.
+let tileInfo = null;
+let prefetchKey = '';
+const prefetchedUrls = new Set();
+
+function findVectorTileInfo() {
+    const sources = map.getStyle().sources || {};
+    for (const id in sources) {
+        if (sources[id].type !== 'vector') continue;
+        const src = map.getSource(id);
+        if (src && src.tiles && src.tiles.length) {
+            return { template: src.tiles[0], maxzoom: src.maxzoom != null ? src.maxzoom : 14 };
+        }
+    }
+    return null;
+}
+
+function lonLatToTile(lat, lon, z) {
+    const n = Math.pow(2, z);
+    const latR = lat * Math.PI / 180;
+    const x = Math.floor((lon + 180) / 360 * n);
+    const y = Math.floor((1 - Math.log(Math.tan(latR) + 1 / Math.cos(latR)) / Math.PI) / 2 * n);
+    return { x: ((x % n) + n) % n, y: Math.max(0, Math.min(n - 1, y)), n };
+}
+
+function prefetchTilesAround(lat, lon) {
+    if (!mapReady) return;
+    if (navigator.connection && navigator.connection.saveData) return; // mode économie de données
+
+    if (!tileInfo) tileInfo = findVectorTileInfo();
+    if (!tileInfo) return;
+
+    const z = Math.min(14, tileInfo.maxzoom);
+    const t = lonLatToTile(lat, lon, z);
+    const key = z + '/' + t.x + '/' + t.y;
+    if (key === prefetchKey) return; // toujours dans la même tuile : rien à faire
+    prefetchKey = key;
+
+    for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+            const y = t.y + dy;
+            if (y < 0 || y >= t.n) continue;
+            const x = (((t.x + dx) % t.n) + t.n) % t.n;
+
+            const url = tileInfo.template
+                .replace('{z}', z).replace('{x}', x).replace('{y}', y);
+            if (prefetchedUrls.has(url)) continue;
+            prefetchedUrls.add(url);
+
+            fetch(url, { mode: 'cors', priority: 'low' })
+                .then(r => r.arrayBuffer())
+                .catch(() => { prefetchedUrls.delete(url); });
+        }
+    }
 }
