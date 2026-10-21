@@ -53,6 +53,13 @@ document.addEventListener("DOMContentLoaded", () => {
     setupModePanelListeners();
     setupSettingsMenu();
 
+    // Cache persistant des tuiles de carte (voir sw.js, à la racine du site)
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+            console.warn('Service worker non enregistré :', err.message);
+        });
+    }
+
     // Bouton de déconnexion (dans le menu Paramètres) : recharger la page après
     // déconnexion est le moyen le plus simple et sûr de repartir sur une
     // base propre (zones, coords, marqueurs).
