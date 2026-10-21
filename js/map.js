@@ -8,7 +8,7 @@ let map;
 let currentMarker;
 let markerOnMap = false;
 let mapReady = false;       // vrai une fois le style chargé et nos couches ajoutées
-let introFlying = false;    // vrai pendant le vol d'introduction vers le joueur
+let cameraBusy = false;     // vrai pendant une séquence de caméra (le suivi GPS ne doit pas l'interrompre)
 
 // Fond de carte vectoriel OpenFreeMap : gratuit, sans clé API, usage commercial
 // autorisé (attribution obligatoire, affichée par le contrôle de la carte).
@@ -66,6 +66,7 @@ function initMap() {
         touchPitch: false,
         pixelRatio: effectivePixelRatio(),
         fadeDuration: qualityPreset().fade,
+        refreshExpiredTiles: false, // inutile de retélécharger des tuiles déjà là
     });
 
     // Les crédits de la carte sont dans le menu Paramètres (plus de contrôle sur la carte).
@@ -73,6 +74,10 @@ function initMap() {
     setZoomAroundCenter(true);
 
     map.on('style.load', onStyleReady);
+
+    // Un geste de l'utilisateur interrompt toute séquence de caméra en cours
+    map.on('dragstart', cancelCameraSequence);
+    map.on('zoomstart', (e) => { if (e.originalEvent) cancelCameraSequence(); });
     map.on('error', (e) => {
         const msg = e && e.error ? e.error.message : String(e);
         console.warn('Erreur carte :', msg);
@@ -364,9 +369,17 @@ function refreshZonesSource() {
 }
 
 // ── Caméra ─────────────────────────────────
-// latlon : [lat, lon]. Suivi GPS passif : ne touche jamais au zoom.
+// latlon : [lat, lon].
+let cameraRunId = 0; // identifie la séquence en cours ; l'incrémenter l'annule
+
+function cancelCameraSequence() {
+    cameraRunId++;
+    cameraBusy = false;
+}
+
+// Suivi GPS passif : ne touche jamais au zoom.
 function mapPanTo(latlon) {
-    if (!mapReady || introFlying) return;
+    if (!mapReady || cameraBusy) return;
 
     // Zone morte : à l'arrêt, le bruit GPS bougerait la caméra en continu et
     // forcerait la carte à se redessiner pour rien.
@@ -376,21 +389,75 @@ function mapPanTo(latlon) {
     map.easeTo({ center: [latlon[1], latlon[0]], duration: 600, easing: t => t });
 }
 
-// Recentrage explicite avec niveau de zoom
-function mapSetView(latlon, zoom) {
-    if (!map) return;
-    introFlying = false;
-    map.easeTo({ center: [latlon[1], latlon[0]], zoom, duration: 800 });
+// Plus court chemin autour de la Terre : ramène la longitude cible à moins de
+// 180° de la longitude actuelle (sinon la carte ferait le grand tour).
+function nearestLng(fromLng, toLng) {
+    const d = ((((toLng - fromLng + 180) % 360) + 360) % 360) - 180;
+    return fromLng + d;
 }
 
-// Premier fix GPS : on descend de la Terre entière jusqu'au joueur.
-function mapIntroFlight(latlon, zoom) {
+// Enchaîne des animations de caméra : chaque étape démarre à la fin de la
+// précédente. Annulable (cancelCameraSequence) si l'utilisateur touche la carte.
+function runCameraSteps(steps) {
+    const runId = ++cameraRunId;
+    cameraBusy = true;
+
+    const next = (i) => {
+        if (runId !== cameraRunId) return;              // séquence annulée
+        if (i >= steps.length) { cameraBusy = false; return; }
+
+        const step = steps[i];
+        const cur = map.getCenter();
+        const sameZoom = step.zoom == null || Math.abs(map.getZoom() - step.zoom) < 0.05;
+        const sameCenter = !step.center || distance([cur.lat, cur.lng], [step.center[1], step.center[0]]) < 5;
+        if (sameZoom && sameCenter) { next(i + 1); return; } // étape sans effet : on saute
+
+        map.once('moveend', () => next(i + 1));
+        map.easeTo(Object.assign({ essential: true }, step));
+    };
+    next(0);
+}
+
+// Recentrage avec niveau de zoom.
+//  - Proche : un seul glissement.
+//  - Loin (autre ville, autre côté de la Terre) : on prend du recul si on est
+//    trop près, on FAIT TOURNER la Terre jusqu'au joueur par le plus court
+//    chemin, puis on zoome tout seul.
+function mapSetView(latlon, zoom) {
     if (!map) return;
-    introFlying = true;
-    map.flyTo({ center: [latlon[1], latlon[0]], zoom, duration: 5000, curve: 1.6, essential: true });
-    // Après flyTo : lancer un vol interrompt d'abord l'animation en cours (suivi GPS),
-    // dont le "moveend" ne doit pas compter comme la fin du vol d'introduction.
-    map.once('moveend', () => { introFlying = false; });
+
+    const lat = latlon[0];
+    const c = map.getCenter();
+    const lng = nearestLng(c.lng, latlon[1]);
+    const dist = distance([c.lat, c.lng], latlon);
+
+    if (dist < 3000) {
+        cancelCameraSequence();
+        map.easeTo({ center: [lng, lat], zoom, duration: 800 });
+        return;
+    }
+
+    // Zoom "de voyage" : plus c'est loin, plus on prend de recul (sans jamais
+    // se rapprocher de ce qu'on voit déjà).
+    let travelZoom = 12;
+    if (dist > 3000000) travelZoom = 1.6;
+    else if (dist > 300000) travelZoom = 3.5;
+    else if (dist > 30000) travelZoom = 6.5;
+    travelZoom = Math.min(travelZoom, map.getZoom());
+
+    const steps = [];
+    if (map.getZoom() - travelZoom > 0.5) {
+        steps.push({ zoom: travelZoom, duration: Math.min(1800, 700 + 120 * (map.getZoom() - travelZoom)) });
+    }
+    steps.push({ center: [lng, lat], duration: 1000 + Math.min(2200, dist / 1e6 * 140) });
+    steps.push({ zoom, duration: Math.min(3200, 1200 + 150 * Math.max(0, zoom - travelZoom)) });
+
+    runCameraSteps(steps);
+}
+
+// Premier fix GPS : la Terre tourne jusqu'au joueur, puis on zoome dessus.
+function mapIntroFlight(latlon, zoom) {
+    mapSetView(latlon, zoom);
 }
 
 // ══════════════════════════════════════════
@@ -439,13 +506,25 @@ function removeClutterLayers() {
 }
 
 // ── Préchargement des tuiles autour du joueur ──
-// Au zoom de jeu, la carte n'utilise que des tuiles vectorielles de zoom 14
-// (~2 km de large). On télécharge les 3×3 autour du joueur dans le cache du
-// navigateur : en bougeant, MapLibre les retrouve sans attendre le réseau.
+// Les tuiles sont téléchargées AVANT d'être utiles, et gardées dans le cache
+// du service worker (sw.js) : le jeu les retrouve instantanément, même après
+// avoir fermé l'application.
+//  - zoom de jeu (z14) et zooms proches (z13 à z11) : les 3×3 tuiles autour du joueur
+//  - zooms plus larges (z10 à z3) : la tuile qui contient le joueur, ce qui
+//    couvre le dézoom et la descente depuis la Terre entière
 // Rien n'est téléchargé loin du joueur.
+const PREFETCH_PLAN = [
+    { z: 14, r: 1 }, { z: 13, r: 1 }, { z: 12, r: 1 }, { z: 11, r: 1 },
+    { z: 10, r: 0 }, { z: 9, r: 0 }, { z: 8, r: 0 }, { z: 7, r: 0 },
+    { z: 6, r: 0 }, { z: 5, r: 0 }, { z: 4, r: 0 }, { z: 3, r: 0 },
+];
+const PREFETCH_CONCURRENCY = 4; // téléchargements en parallèle : on ne bloque pas les vraies requêtes de la carte
+
 let tileInfo = null;
 let prefetchKey = '';
 const prefetchedUrls = new Set();
+const prefetchQueue = [];
+let prefetchActive = 0;
 
 function findVectorTileInfo() {
     const sources = map.getStyle().sources || {};
@@ -467,6 +546,17 @@ function lonLatToTile(lat, lon, z) {
     return { x: ((x % n) + n) % n, y: Math.max(0, Math.min(n - 1, y)), n };
 }
 
+function pumpPrefetch() {
+    while (prefetchActive < PREFETCH_CONCURRENCY && prefetchQueue.length) {
+        const url = prefetchQueue.shift();
+        prefetchActive++;
+        fetch(url, { mode: 'cors', priority: 'low' })
+            .then(r => r.arrayBuffer())
+            .catch(() => { prefetchedUrls.delete(url); })
+            .finally(() => { prefetchActive--; pumpPrefetch(); });
+    }
+}
+
 function prefetchTilesAround(lat, lon) {
     if (!mapReady) return;
     if (navigator.connection && navigator.connection.saveData) return; // mode économie de données
@@ -474,26 +564,37 @@ function prefetchTilesAround(lat, lon) {
     if (!tileInfo) tileInfo = findVectorTileInfo();
     if (!tileInfo) return;
 
-    const z = Math.min(14, tileInfo.maxzoom);
-    const t = lonLatToTile(lat, lon, z);
-    const key = z + '/' + t.x + '/' + t.y;
-    if (key === prefetchKey) return; // toujours dans la même tuile : rien à faire
+    // Toujours dans la même tuile de zoom 14 : rien de nouveau à charger
+    const zMax = Math.min(14, tileInfo.maxzoom);
+    const t14 = lonLatToTile(lat, lon, zMax);
+    const key = zMax + '/' + t14.x + '/' + t14.y;
+    if (key === prefetchKey) return;
     prefetchKey = key;
 
-    for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-            const y = t.y + dy;
-            if (y < 0 || y >= t.n) continue;
-            const x = (((t.x + dx) % t.n) + t.n) % t.n;
+    // Le joueur a changé de tuile : les téléchargements pas encore partis ne
+    // servent plus à rien, on repart de la liste à jour.
+    prefetchQueue.forEach(u => prefetchedUrls.delete(u));
+    prefetchQueue.length = 0;
 
-            const url = tileInfo.template
-                .replace('{z}', z).replace('{x}', x).replace('{y}', y);
-            if (prefetchedUrls.has(url)) continue;
-            prefetchedUrls.add(url);
+    PREFETCH_PLAN.forEach(({ z, r }) => {
+        if (z > tileInfo.maxzoom) return;
+        const t = lonLatToTile(lat, lon, z);
 
-            fetch(url, { mode: 'cors', priority: 'low' })
-                .then(r => r.arrayBuffer())
-                .catch(() => { prefetchedUrls.delete(url); });
+        // La tuile du joueur d'abord, puis son anneau
+        for (let dx = -r; dx <= r; dx++) {
+            for (let dy = -r; dy <= r; dy++) {
+                const y = t.y + dy;
+                if (y < 0 || y >= t.n) continue;
+                const x = (((t.x + dx) % t.n) + t.n) % t.n;
+
+                const url = tileInfo.template
+                    .replace('{z}', z).replace('{x}', x).replace('{y}', y);
+                if (prefetchedUrls.has(url)) continue;
+                prefetchedUrls.add(url);
+                prefetchQueue.push(url);
+            }
         }
-    }
+    });
+
+    pumpPrefetch();
 }
