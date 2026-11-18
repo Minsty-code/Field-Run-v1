@@ -31,7 +31,7 @@ const MIN_GPS_ACCURACY_METERS = 20;
 const ABSURD_SPEED_KMH = 150;
 
 let gameSpeedMode = "course"; // "course" (marche/course) ou "velo"
-let speedLimitTestEnabled = false; // interrupteur de test — désactivé par défaut
+let speedLimitDisabled = false; // la limite est ACTIVE par défaut ; l'interrupteur du panneau « Mode de jeu » permet de la désactiver (tests)
 
 let speedSamples = []; // historique récent : { point, time, accuracy }
 let speedPenaltyTimer = 0; // secondes cumulées au-dessus de la limite (0 à 5)
@@ -51,18 +51,14 @@ function recordSpeedSample(point, timeMs, accuracy) {
     speedSamples = speedSamples.filter(s => s.time >= cutoff);
 
     // La case à cocher fait foi, lue à chaque position : le navigateur peut
-    // restaurer une case déjà cochée après un rechargement SANS déclencher
-    // l'événement "change" — la variable restait alors à false pour toujours.
-    const testToggleEl = document.getElementById('speedLimitTestToggle');
-    if (testToggleEl) speedLimitTestEnabled = testToggleEl.checked;
+    // restaurer une case cochée après un rechargement SANS déclencher
+    // l'événement "change".
+    const offToggleEl = document.getElementById('speedLimitOffToggle');
+    if (offToggleEl) speedLimitDisabled = offToggleEl.checked;
 
-    const applies = speedLimitTestEnabled && isRunning && coords.length > 0;
+    const applies = !speedLimitDisabled && isRunning && coords.length > 0;
 
     if (!applies) {
-        const why = !speedLimitTestEnabled ? "interrupteur de test désactivé"
-            : !isRunning ? "course non lancée (appuie sur RUN)"
-            : "pas encore de tracé (sors de ta zone / avance)";
-        updateSpeedDebug(`INACTIF — ${why}`);
         if (speedPenaltyTimer > 0) {
             speedPenaltyTimer = 0;
             hideSpeedPenaltyUI();
@@ -72,15 +68,6 @@ function recordSpeedSample(point, timeMs, accuracy) {
     }
 
     const speedKmh = computeCurrentSpeedKmh();
-
-    const accText = accuracy == null ? "?" : Math.round(accuracy) + " m";
-    const validCount = speedSamples.filter(s => s.accuracy == null || s.accuracy <= MIN_GPS_ACCURACY_METERS).length;
-    updateSpeedDebug(
-        `ACTIF — précision GPS : ${accText} (ignorée si > ${MIN_GPS_ACCURACY_METERS} m) · ` +
-        `points fiables : ${validCount} · ` +
-        `vitesse : ${speedKmh === null ? "— (pas assez de points fiables)" : speedKmh.toFixed(1) + " km/h"} · ` +
-        `limite : ${currentSpeedLimitKmh()} km/h · chrono : ${speedPenaltyTimer.toFixed(1)} s`
-    );
 
     if (lastSpeedCheckTime === null) {
         lastSpeedCheckTime = timeMs;
@@ -141,13 +128,6 @@ function computeCurrentSpeedKmh() {
 
     const speedMs = totalDistance / elapsedSeconds;
     return speedMs * 3.6; // m/s -> km/h
-}
-
-// Diagnostic TEMPORAIRE affiché dans le panneau de mode (à retirer une fois
-// la limite validée sur le terrain).
-function updateSpeedDebug(text) {
-    const el = document.getElementById('speedDebugLine');
-    if (el) el.textContent = "Diagnostic : " + text;
 }
 
 // Annule le tracé en cours pour excès de vitesse — la course, elle, continue.
@@ -239,11 +219,13 @@ function setupModePanelListeners() {
     document.getElementById('modeOptionCourse').addEventListener('click', () => setGameSpeedMode("course"));
     document.getElementById('modeOptionVelo').addEventListener('click', () => setGameSpeedMode("velo"));
 
-    const testToggle = document.getElementById('speedLimitTestToggle');
-    speedLimitTestEnabled = testToggle.checked;
-    testToggle.addEventListener('change', () => {
-        speedLimitTestEnabled = testToggle.checked;
-        if (!speedLimitTestEnabled) {
+    // Interrupteur de test : coché = limite désactivée. Jamais mémorisé : la
+    // limite se réactive toute seule à chaque lancement du jeu.
+    const offToggle = document.getElementById('speedLimitOffToggle');
+    speedLimitDisabled = offToggle.checked;
+    offToggle.addEventListener('change', () => {
+        speedLimitDisabled = offToggle.checked;
+        if (speedLimitDisabled) {
             speedPenaltyTimer = 0;
             lastSpeedCheckTime = null;
             hideSpeedPenaltyUI();
