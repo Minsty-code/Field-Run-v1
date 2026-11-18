@@ -169,7 +169,7 @@ function applyNeonTheme() {
                 setPaint('fill-color', fillColorFor(id));
                 break;
             case 'fill-extrusion':
-                setPaint('fill-extrusion-color', '#1a1a2c');
+                setPaint('fill-extrusion-color', '#2e2e56'); // assez clair pour que les volumes 3D se lisent sur le sol sombre
                 break;
             case 'line':
                 setPaint('line-color', lineColorFor(id));
@@ -493,7 +493,7 @@ function applyQualityToMap() {
 // routiers, sens uniques et aéroports/sommets. Les routes, les bâtiments (3D
 // compris) et les noms de lieux et de rues restent. On ne touche qu'aux symboles.
 const CLUTTER_SOURCE_LAYERS = new Set(['poi', 'housenumber', 'aerodrome_label', 'mountain_peak']);
-const CLUTTER_ID_PATTERN = /poi|transit|housenumber|shield|oneway|aerialway|airport|mountain|peak/;
+const CLUTTER_ID_PATTERN = /^poi[_-]|housenumber|shield|one_?way|aerialway|airport|mountain|peak/;
 
 function removeClutterLayers() {
     (map.getStyle().layers || []).forEach(layer => {
