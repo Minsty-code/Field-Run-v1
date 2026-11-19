@@ -50,14 +50,24 @@ function pointsToGeoJSON(points) {
 // Renvoie l'id de la zone créée en base (ou null si échec), pour que game.js
 // puisse faire correspondre l'id local de la zone à l'id réel — nécessaire
 // pour reconnaître plus tard un événement temps réel qui la concerne.
-async function saveZoneToSupabase(points, area) {
+async function saveZoneToSupabase(points, area, mode) {
     const geojson = pointsToGeoJSON(points);
 
-    const { data, error } = await supabaseClient.rpc("insert_zone", {
+    const params = {
         p_owner_name: currentUsername || "Joueur",
         p_geojson: geojson,
         p_area: area,
-    });
+    };
+
+    let { data, error } = await supabaseClient.rpc("insert_zone", { ...params, p_mode: mode || "course" });
+
+    // Tant que la fonction SQL insert_zone n'a pas reçu son paramètre p_mode
+    // (migration des modes), l'appel ci-dessus échoue : on retombe sur
+    // l'ancienne signature pour ne jamais perdre une capture.
+    if (error && (error.code === "PGRST202" || /p_mode|schema cache|Could not find/i.test(error.message || ""))) {
+        console.warn("insert_zone sans p_mode (migration SQL des modes pas encore faite)");
+        ({ data, error } = await supabaseClient.rpc("insert_zone", params));
+    }
 
     if (error) {
         // On ne bloque jamais le jeu si la sauvegarde échoue (ex: pas de
@@ -81,7 +91,9 @@ async function saveZoneToSupabase(points, area) {
 // d'affichage pour éviter qu'une zone clignote à la limite.
 const ZONE_LOAD_RADIUS_M = 10000;
 const ZONE_UNLOAD_RADIUS_M = 15000;
-const deferredZoneEntries = new Map(); // id -> { id, owner, points, area, colorIndex }
+const deferredZoneEntries = new Map(); // id -> { id, owner, points, area, colorIndex, mode }
+// Zones de l'AUTRE mode de jeu : gardées en mémoire (jamais dessinées) jusqu'au changement de mode.
+const parkedZoneEntries = new Map();
 let lastZoneRefreshPoint = null;
 
 async function loadAllZonesFromSupabase() {
@@ -106,7 +118,7 @@ async function loadAllZonesFromSupabase() {
 // reste, toujours à notre nom) — il faut bien l'afficher dans ce cas, d'où
 // la vérification par id plutôt que par owner_id.
 function addRemoteZoneToMap(row) {
-    if (zones.some(z => z.id === row.id) || deferredZoneEntries.has(row.id)) return;
+    if (zones.some(z => z.id === row.id) || deferredZoneEntries.has(row.id) || parkedZoneEntries.has(row.id)) return;
 
     let geo;
     try {
@@ -127,16 +139,54 @@ function addRemoteZoneToMap(row) {
         points: latLngPoints,
         area: row.area_m2,
         colorIndex: row.color_index,
+        mode: row.mode || "course", // zones d'avant les modes = mode Course
     };
 
-    // Zone d'un autre joueur trop lointaine : on la garde sans la dessiner
-    if (!isMine && typeof lastPosition !== 'undefined' && lastPosition &&
-        distance(lastPosition, latLngPoints[0]) > ZONE_LOAD_RADIUS_M) {
+    placeZoneEntry(entry);
+}
+
+// Range une zone au bon endroit : en réserve si elle est d'un autre mode, en
+// différé si c'est celle d'un autre joueur trop lointaine, sinon sur la carte.
+function placeZoneEntry(entry) {
+    if (entry.mode !== gameSpeedMode) {
+        parkedZoneEntries.set(entry.id, entry);
+        return;
+    }
+
+    if (entry.owner !== "player" && typeof lastPosition !== 'undefined' && lastPosition &&
+        distance(lastPosition, entry.points[0]) > ZONE_LOAD_RADIUS_M) {
         deferredZoneEntries.set(entry.id, entry);
         return;
     }
 
     showZoneEntry(entry);
+}
+
+// Changement de mode : tout ce qui est affiché passe en réserve, et les zones du
+// nouveau mode en sortent. `zones` ne contient donc toujours que le mode actif,
+// ce qui fait que score, surface et détection de territoire ne voient que lui.
+function switchZoneModeView(newMode) {
+    for (let i = zones.length - 1; i >= 0; i--) {
+        const z = zones[i];
+        removeZoneFromMap(z.mapKey);
+        parkedZoneEntries.set(z.id, {
+            id: z.id, owner: z.owner, points: z.points, area: z.area,
+            colorIndex: z.colorIndex, mode: z.mode,
+        });
+    }
+    zones.length = 0;
+
+    deferredZoneEntries.forEach((entry, id) => parkedZoneEntries.set(id, entry));
+    deferredZoneEntries.clear();
+
+    parkedZoneEntries.forEach((entry, id) => {
+        if (entry.mode !== newMode) return;
+        parkedZoneEntries.delete(id);
+        placeZoneEntry(entry);
+    });
+
+    lastZoneRefreshPoint = null; // force la mise à jour du rayon d'affichage au prochain GPS
+    recalculatePlayerStatsFromZones();
 }
 
 // Dessine une zone sur la carte et l'enregistre dans la liste des zones actives
@@ -148,6 +198,7 @@ function showZoneEntry(entry) {
         points: entry.points,
         area: entry.area,
         colorIndex: entry.colorIndex,
+        mode: entry.mode,
         mapKey: mapKey,
     });
 }
@@ -166,7 +217,8 @@ function maybeRefreshZonesAroundPlayer(point) {
             removeZoneFromMap(z.mapKey);
             zones.splice(i, 1);
             deferredZoneEntries.set(z.id, {
-                id: z.id, owner: z.owner, points: z.points, area: z.area, colorIndex: z.colorIndex,
+                id: z.id, owner: z.owner, points: z.points, area: z.area,
+                colorIndex: z.colorIndex, mode: z.mode,
             });
         }
     }
@@ -183,6 +235,7 @@ function maybeRefreshZonesAroundPlayer(point) {
 // vient d'être découpée/absorbée par la capture d'un autre joueur)
 function removeZoneById(zoneId) {
     deferredZoneEntries.delete(zoneId);
+    parkedZoneEntries.delete(zoneId);
 
     const index = zones.findIndex(z => z.id === zoneId);
     if (index === -1) return;
