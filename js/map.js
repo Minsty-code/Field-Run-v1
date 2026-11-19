@@ -51,13 +51,41 @@ window.addEventListener('unhandledrejection', (e) => {
 
 let mapErrorCount = 0;
 
+// ── Vue d'ouverture ────────────────────────
+// À l'ouverture, la carte s'affiche directement près de la dernière position
+// connue du joueur (vue de quartier) au lieu de la Terre entière ; le premier
+// fix GPS affine ensuite le cadrage. Première ouverture, sans position connue :
+// vue d'ensemble de la France.
+const LAST_POS_KEY = 'fieldrun_last_pos';
+const OPEN_ZOOM = 14;
+const FALLBACK_VIEW = { center: [2.35, 46.6], zoom: 5 };
+let lastPosSavedAt = 0;
+
+function loadLastPosition() {
+    try {
+        const p = JSON.parse(localStorage.getItem(LAST_POS_KEY));
+        if (p && isFinite(p.lat) && isFinite(p.lon)) return p;
+    } catch (e) { /* stockage indisponible ou vide */ }
+    return null;
+}
+
+// Au plus une écriture toutes les 10 s
+function saveLastPosition(lat, lon) {
+    const now = Date.now();
+    if (now - lastPosSavedAt < 10000) return;
+    lastPosSavedAt = now;
+    try { localStorage.setItem(LAST_POS_KEY, JSON.stringify({ lat, lon })); } catch (e) { /* sans importance */ }
+}
+
 // ── Initialisation carte ───────────────────
 function initMap() {
+    const start = loadLastPosition();
+
     map = new maplibregl.Map({
         container: 'map',
         style: MAP_STYLE_URL,
-        center: [10, 25],          // vue d'ensemble : toute la Terre visible
-        zoom: 1.4,
+        center: start ? [start.lon, start.lat] : FALLBACK_VIEW.center,
+        zoom: start ? OPEN_ZOOM : FALLBACK_VIEW.zoom,
         minZoom: 0.8,
         maxZoom: 20,
         attributionControl: false,
@@ -258,6 +286,7 @@ function updateMarkerSpeed(kmh) {
 
 function updateMarker(lat, lon) {
     currentMarker.setLngLat([lon, lat]);
+    saveLastPosition(lat, lon);
     prefetchTilesAround(lat, lon);
     if (!markerOnMap) {
         currentMarker.addTo(map);
@@ -401,6 +430,21 @@ function nearestLng(fromLng, toLng) {
 function runCameraSteps(steps) {
     const runId = ++cameraRunId;
     cameraBusy = true;
+
+    // Garde-fou : si un "moveend" se perdait en route, la caméra ne doit jamais
+    // rester bloquée à mi-chemin (par exemple sur la vue de la Terre entière) :
+    // on force alors la vue finale.
+    const finalCenter = steps.reduce((c, s) => s.center || c, null);
+    const finalZoom = steps.reduce((z, s) => (s.zoom != null ? s.zoom : z), null);
+    const totalMs = steps.reduce((sum, s) => sum + (s.duration || 0), 0);
+    setTimeout(() => {
+        if (runId !== cameraRunId || !cameraBusy) return; // annulée, ou déjà terminée normalement
+        cameraBusy = false;
+        const view = {};
+        if (finalCenter) view.center = finalCenter;
+        if (finalZoom != null) view.zoom = finalZoom;
+        map.jumpTo(view);
+    }, totalMs + 2500);
 
     const next = (i) => {
         if (runId !== cameraRunId) return;              // séquence annulée
