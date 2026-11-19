@@ -466,7 +466,10 @@ function closeZone(points, remainingTrace) {
 
     const mapKey = addZoneToMap(points, colorForIndex(currentColorIndex));
 
-    const newZoneObj = { id: `player_${Date.now()}`, owner: "player", points, area, mapKey };
+    const newZoneObj = {
+        id: `player_${Date.now()}`, owner: "player", points, area, mapKey,
+        colorIndex: currentColorIndex, mode: gameSpeedMode,
+    };
     zones.push(newZoneObj);
 
     // Le score/surface affichés sont toujours recalculés depuis les zones
@@ -479,7 +482,7 @@ function closeZone(points, remainingTrace) {
     // Fait correspondre l'id local au véritable id renvoyé par le serveur,
     // pour que les futurs événements temps réel (ex: quelqu'un découpe cette
     // même zone plus tard) puissent la reconnaître.
-    saveZoneToSupabase(points, area).then(realId => {
+    saveZoneToSupabase(points, area, newZoneObj.mode).then(realId => {
         if (realId) newZoneObj.id = realId;
     });
 }
@@ -548,4 +551,4 @@ function stopTracking() {
     }
     updateButtonsUI(false);
     coords = [];
-    }
+}
