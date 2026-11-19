@@ -30,7 +30,17 @@ const MIN_GPS_ACCURACY_METERS = 20;
 // à part, à traiter plus tard avec la détection de spoofing.
 const ABSURD_SPEED_KMH = 150;
 
-let gameSpeedMode = "course"; // "course" (marche/course) ou "velo"
+// Chaque mode est une partie distincte : ses zones restent dans ce mode. Le jeu
+// s'ouvre dans le dernier mode utilisé.
+const GAME_MODE_STORAGE_KEY = 'fieldrun_game_mode';
+function loadSavedGameMode() {
+    try {
+        const saved = localStorage.getItem(GAME_MODE_STORAGE_KEY);
+        if (saved === "velo" || saved === "course") return saved;
+    } catch (e) { /* stockage indisponible : mode par défaut */ }
+    return "course";
+}
+let gameSpeedMode = loadSavedGameMode(); // "course" (marche/course) ou "velo"
 let speedLimitDisabled = false; // la limite est ACTIVE par défaut ; l'interrupteur du panneau « Mode de jeu » permet de la désactiver (tests)
 
 let speedSamples = []; // historique récent : { point, time, accuracy }
@@ -201,17 +211,35 @@ function toggleModePanel() {
     }
 }
 
-function setGameSpeedMode(mode) {
-    gameSpeedMode = mode;
+// Met à jour l'affichage (bouton + panneau) pour le mode donné, sans rien changer d'autre
+function applyGameModeUI(mode) {
     document.getElementById('modeLabel').textContent = mode === "velo" ? "Vélo" : "Course";
 
     document.getElementById('modeOptionCourse').classList.toggle('active', mode !== "velo");
     document.getElementById('modeOptionVelo').classList.toggle('active', mode === "velo");
 }
 
+// Changement de mode demandé par le joueur : la carte, le score et la surface
+// passent d'un coup sur les zones du nouveau mode. Interdit pendant une course,
+// pour ne jamais mélanger les deux modes dans un même tracé.
+function setGameSpeedMode(mode) {
+    if (mode === gameSpeedMode) return;
+
+    if (isRunning) {
+        closeModePanel();
+        showSpeedCutoffToast("Termine ta course avant de changer de mode.");
+        return;
+    }
+
+    gameSpeedMode = mode;
+    try { localStorage.setItem(GAME_MODE_STORAGE_KEY, mode); } catch (e) { /* sans importance */ }
+    applyGameModeUI(mode);
+    if (typeof switchZoneModeView === 'function') switchZoneModeView(mode);
+}
+
 function setupModePanelListeners() {
     // Le bouton affiche le vrai mode actif dès le départ (pas un "Solo" figé)
-    setGameSpeedMode(gameSpeedMode);
+    applyGameModeUI(gameSpeedMode);
 
     document.getElementById('BtnMode').addEventListener('click', toggleModePanel);
     document.getElementById('modePanelClose').addEventListener('click', closeModePanel);
@@ -231,4 +259,4 @@ function setupModePanelListeners() {
             hideSpeedPenaltyUI();
         }
     });
-}
+        }
