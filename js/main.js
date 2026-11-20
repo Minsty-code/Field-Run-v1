@@ -39,11 +39,9 @@ document.addEventListener("DOMContentLoaded", () => {
         document.body.classList.add("game-running");
     });
 
-    Btnstop.addEventListener("click", () => {
-        stopTracking();
-        switchToStart();
-        document.body.classList.remove("game-running");
-    });
+    // STOP ouvre un écran de confirmation : la course ne s'arrête vraiment
+    // qu'une fois le bouton « Finir la course » colorié (voir stopconfirm.js).
+    Btnstop.addEventListener("click", openStopConfirm);
 
     // Le GPS/la carte ne démarrent qu'une fois le joueur authentifié.
     // initAuth() (dans auth.js) affiche l'écran de connexion si besoin, et
@@ -52,6 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setupModePanelListeners();
     setupSettingsMenu();
+    setupStopConfirm();
 
     // Cache persistant des tuiles de carte (voir sw.js, à la racine du site)
     if ('serviceWorker' in navigator) {
@@ -82,4 +81,8 @@ function startGameAfterAuth(username) {
     // les nouvelles captures en direct.
     loadAllZonesFromSupabase();
     subscribeToZoneRealtime();
+
+    // Zones d'une course interrompue (navigateur fermé en pleine course) : on les renvoie
+    restorePendingZones();
+    if (pendingZoneSaves.length > 0) commitPendingZones();
 }
