@@ -76,7 +76,7 @@ async function saveZoneToSupabase(points, area, mode) {
         return null;
     }
 
-    return data; // uuid renvoyé par insert_zone
+    return data || true; // uuid renvoyé par insert_zone (true si la fonction ne renvoie rien)
 }
 
 
