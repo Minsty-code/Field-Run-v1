@@ -479,12 +479,84 @@ function closeZone(points, remainingTrace) {
     // distante change ce qu'on possède).
     recalculatePlayerStatsFromZones();
 
-    // Fait correspondre l'id local au véritable id renvoyé par le serveur,
-    // pour que les futurs événements temps réel (ex: quelqu'un découpe cette
-    // même zone plus tard) puissent la reconnaître.
-    saveZoneToSupabase(points, area, newZoneObj.mode).then(realId => {
-        if (realId) newZoneObj.id = realId;
-    });
+    // La zone reste provisoire (visible chez soi seulement) : elle n'est
+    // enregistrée en ligne qu'à la confirmation de fin de course.
+    pendingZoneSaves.push({ zoneObj: newZoneObj, points, area, mode: newZoneObj.mode });
+    persistPendingZones();
+}
+
+
+//====================
+// Zones en attente de validation
+//====================
+// Les zones fermées pendant une course sont provisoires jusqu'à la
+// confirmation de fin de course : c'est à ce moment qu'elles sont enregistrées
+// en ligne (visibles des autres joueurs, et pouvant découper des zones adverses).
+// La liste est aussi gardée dans le stockage du téléphone : si le navigateur est
+// fermé en pleine course, les zones sont renvoyées au prochain lancement.
+const PENDING_ZONES_KEY = 'fieldrun_pending_zones';
+let pendingZoneSaves = [];            // { zoneObj?, points, area, mode }
+let commitChain = Promise.resolve();  // les enregistrements se font l'un après l'autre
+
+function persistPendingZones() {
+    try {
+        if (pendingZoneSaves.length === 0) {
+            localStorage.removeItem(PENDING_ZONES_KEY);
+            return;
+        }
+        localStorage.setItem(PENDING_ZONES_KEY, JSON.stringify({
+            userId: currentUserId,
+            zones: pendingZoneSaves.map(p => ({ points: p.points, area: p.area, mode: p.mode })),
+        }));
+    } catch (e) { /* stockage plein ou indisponible : sans importance */ }
+}
+
+// Zones d'une course interrompue (navigateur fermé...) : on les remet dans la file.
+// Seulement celles du compte actuellement connecté.
+function restorePendingZones() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(PENDING_ZONES_KEY));
+        if (!saved || saved.userId !== currentUserId || !Array.isArray(saved.zones)) return;
+
+        saved.zones.forEach(z => {
+            if (z && Array.isArray(z.points) && z.points.length >= 3) {
+                pendingZoneSaves.push({ points: z.points, area: z.area, mode: z.mode || "course" });
+            }
+        });
+    } catch (e) { /* données illisibles : on ignore */ }
+}
+
+// Enregistre en ligne, une par une et dans l'ordre, les zones en attente.
+// Renvoie { saved, failed } ; celles qui échouent (réseau) restent en attente.
+function commitPendingZones() {
+    const run = commitChain.then(doCommitPendingZones);
+    commitChain = run.catch(() => {});
+    return run;
+}
+
+async function doCommitPendingZones() {
+    const queue = pendingZoneSaves;
+    pendingZoneSaves = [];
+
+    let saved = 0;
+    const failed = [];
+
+    for (const item of queue) {
+        const realId = await saveZoneToSupabase(item.points, item.area, item.mode);
+        if (realId) {
+            saved++;
+            // Fait correspondre l'id local au véritable id renvoyé par le serveur,
+            // pour que les futurs événements temps réel (ex: quelqu'un découpe
+            // cette même zone plus tard) puissent la reconnaître.
+            if (item.zoneObj && typeof realId === "string") item.zoneObj.id = realId;
+        } else {
+            failed.push(item);
+        }
+    }
+
+    pendingZoneSaves = failed.concat(pendingZoneSaves);
+    persistPendingZones();
+    return { saved, failed: failed.length };
 }
 
 // Recalcule le score et la surface totale du joueur à partir des zones qu'il
