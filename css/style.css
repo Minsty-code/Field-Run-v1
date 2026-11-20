@@ -293,14 +293,14 @@ html, body {
 
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 
     background: var(--glass);
     backdrop-filter: var(--blur);
     -webkit-backdrop-filter: var(--blur);
     border: 1px solid rgba(255, 100, 0, 0.22);
     border-radius: var(--rmd);
-    padding: 9px 12px;
+    padding: 8px 14px 8px 12px;
 
     box-shadow: 0 4px 22px rgba(0,0,0,0.45);
     animation: streakGlow 3s ease-in-out infinite;
@@ -328,29 +328,12 @@ html, body {
 
 #dailyInfos {
     display: flex;
-    flex-direction: column;
-    line-height: 1.3;
-}
-#dailyLabel {
-    font-size: 9px;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--textdim);
+    line-height: 1;
 }
 #dailyCount {
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 900;
     color: #FF8C00;
-}
-#dailyBadge {
-    font-size: 11px;
-    font-weight: 900;
-    color: #FF8C00;
-    background: rgba(255,140,0,0.14);
-    border: 1px solid rgba(255,140,0,0.28);
-    border-radius: var(--rlg);
-    padding: 2px 8px;
 }
 
 /* ════════════════════════
@@ -1117,4 +1100,95 @@ body.q-performances #xpGlow,
 body.q-performances .btnPulse,
 body.q-performances .playerDotRing {
     animation: none !important;
+}
+
+
+/* ════════════════════════
+   CONFIRMATION DE FIN DE COURSE
+════════════════════════ */
+#stopConfirm {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9600;
+    background: rgba(0,0,0,0.78);
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+#stopConfirmContent {
+    width: 100%;
+    max-width: 380px;
+    background: var(--dark3, #16161d);
+    border: 1px solid var(--glassb, rgba(255,255,255,0.08));
+    border-radius: 20px;
+    padding: 22px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+#stopConfirmTitle {
+    font-family: "Barlow", sans-serif;
+    font-weight: 800;
+    font-size: 20px;
+    color: #fff;
+}
+#stopConfirmText {
+    color: var(--textdim, #999);
+    font-size: 14px;
+    line-height: 1.5;
+}
+#stopConfirmCancel {
+    width: 100%;
+    padding: 14px;
+    border-radius: 14px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.22);
+    color: #fff;
+    font-family: "Barlow", sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+/* Bouton à colorier : fond clair, texte foncé — le texte reste lisible
+   aussi bien sur le fond que sur le rouge qui le recouvre peu à peu. */
+#stopPaintBtn {
+    position: relative;
+    width: 100%;
+    height: 64px;
+    margin-top: 6px;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #D9D9E0;
+    border: 2px solid rgba(255, 45, 61, 0.65);
+    user-select: none;
+    -webkit-user-select: none;
+}
+#stopPaintCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+}
+#stopPaintLabel {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    color: #14141C;
+    font-family: "Barlow", sans-serif;
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+#stopPaintHint {
+    text-align: center;
+    color: var(--textdim, #999);
+    font-size: 12px;
 }
