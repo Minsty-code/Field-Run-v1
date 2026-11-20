@@ -117,10 +117,8 @@
             <span id="dailyFlame">🔥</span>
         </div>
         <div id="dailyInfos">
-            <span id="dailyLabel">Daily Streak</span>
-            <span id="dailyCount">§ jours</span>
+            <span id="dailyCount">§</span>
         </div>
-        <div id="dailyBadge">+§</div>
     </div>
 
     <!-- ═══ HUD BAS GAUCHE : Bouton recentrer ═══ -->
@@ -226,6 +224,22 @@
         </div>
     </div>
 
+    <!-- ═══ Confirmation de fin de course (bouton à colorier) ═══ -->
+    <div id="stopConfirm">
+        <div id="stopConfirmContent">
+            <h2 id="stopConfirmTitle">Terminer la course ?</h2>
+            <p id="stopConfirmText"></p>
+
+            <button id="stopConfirmCancel">Annuler et revenir en jeu</button>
+
+            <div id="stopPaintBtn">
+                <canvas id="stopPaintCanvas"></canvas>
+                <span id="stopPaintLabel">Finir la course</span>
+            </div>
+            <p id="stopPaintHint">Colorie tout le bouton avec ton doigt pour confirmer</p>
+        </div>
+    </div>
+
     <!-- ═══ Anti-triche vitesse : retour visuel ═══ -->
     <div id="speedPenaltyOverlay"></div>
     <div id="speedPenaltySign">
@@ -242,6 +256,7 @@
     <script src="js/anticheat.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/settings.js"></script>
+    <script src="js/stopconfirm.js"></script>
     <script src="js/main.js"></script>
 </body>
-                                </html>
+    </html>
