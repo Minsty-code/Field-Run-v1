@@ -616,7 +616,7 @@ html, body {
 #authScreen {
     position: fixed;
     inset: 0;
-    z-index: 2000;
+    z-index: 9700; /* au-dessus de tout le HUD et des panneaux, sous le loader GPS */
     display: none; /* activé en JS (flex) selon l'état de connexion */
     flex-direction: column;
     align-items: center;
@@ -797,18 +797,41 @@ html, body {
     text-align: center;
     line-height: 1.4;
 }
-#authSwitchText {
-    text-align: center;
+#authInfo {
+    display: none;
     color: var(--textdim);
     font-size: 12.5px;
-    margin-top: 4px;
+    text-align: center;
+    line-height: 1.45;
+    margin-bottom: 2px;
 }
-#authSwitchLink {
+/* Saisie du code reçu par email : gros chiffres espacés, centrés */
+#authForm input#authCode {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: 0.35em;
+    padding-left: calc(14px + 0.35em); /* recentre visuellement malgré l'espacement final */
+}
+#authForm input#authCode::placeholder {
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+}
+#authLinks {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    margin-top: 6px;
+}
+.authLink {
     color: var(--gold);
     font-weight: 700;
+    font-size: 12.5px;
     cursor: pointer;
 }
-#authSwitchLink:hover {
+.authLink:hover {
     text-decoration: underline;
 }
 
