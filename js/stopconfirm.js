@@ -5,7 +5,7 @@
 //  la course sont enregistrées pour de bon.
 // ══════════════════════════════════════════
 
-const PAINT_BRUSH_RADIUS = 25;   // rayon du pinceau (px CSS)
+const PAINT_BRUSH_RADIUS = 36;   // rayon du pinceau (px CSS)
 const PAINT_CELL = 4;            // taille d'une cellule du suivi de couverture (px CSS)
 const PAINT_DONE_RATIO = 0.99;   // part du bouton à colorier ; pas 100 % : un petit coin oublié ne doit jamais bloquer
 const PAINT_COLOR = '#FF2D3D';
